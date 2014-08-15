@@ -1,0 +1,168 @@
+<?php
+
+function controlm_fetch_runtimes_menu () {
+	$items = array();
+	$items['admin/config/services/controlm_fetch_runtimes'] = array(
+		'title' => 'Control-M Fetch Run Times',
+		'description' => 'Configuration for Control-M Fetch Run Times module',
+		'page callback' => 'drupal_get_form',
+		'page arguments' => array('controlm_fetch_runtimes_form'),
+		'access arguments' => array('access administration pages'),
+		'type' => MENU_NORMAL_ITEM,
+	);
+	$items['controlm/fetch_runtimes'] = array(
+		'title' => 'Fetch Run Time Data',
+		'page callback' => 'controlm_fetch_runtimes_execute',
+		'access arguments' => array('access administration pages'),
+		'type' => MENU_NORMAL_ITEM,
+	);
+	return $items;
+}
+function controlm_fetch_runtimes_execute() {
+  return array('#markup' => '<p>' . t(cmGetRuntime()) . '</p>');
+}
+function controlm_fetch_runtimes_form ($form, &$form_state) {
+	$form['controlm_fetch_runtimes_cron'] = array(
+		'#type' => 'checkbox',
+		'#title' => t('Run during Cron?'),
+		'#default_value' => variable_get('controlm_fetch_runtimes_cron',1),
+		'#description' => t('Do we want to run the fetch periodically through cron?'),
+		'#required' => FALSE,
+	);
+	$form['controlm_fetch_runtimes_interval'] = array(
+		'#type' => 'textfield',
+		'#title' => t('Cron Interval'),
+		'#default_value' => variable_get('controlm_fetch_runtimes_interval',3600),
+		'#size' => 10,
+		'#maxlength' => 10,
+		'#description' => t('The number of seconds between Cron executions.'),
+		'#required' => TRUE,
+	);
+	return system_settings_form($form);
+}
+function controlm_fetch_runtimes_form_validate ($form, &$form_state) {
+	if(!ctype_digit(strval($form_state['values']['controlm_fetch_runtimes_interval']))) {
+		form_set_error('controlm_fetch_runtimes_interval', t('Interval value must be an integer.'));
+	}
+	if($form_state['values']['controlm_fetch_runtimes_interval'] <= 0) {
+		form_set_error('controlm_fetch_runtimes_interval', t('Interval value must be greater than zero.'));
+	}
+}
+function controlm_fetch_runtimes_cron() {
+	$enabled = variable_get('controlm_fetch_runtimes_cron',0);
+	if($enabled = 1) {
+		$interval = variable_get('controlm_fetch_runtimes_interval',3600);
+		if (time() >= variable_get('controlm_fetch_runtimes_next_execution', 0)) {
+			drupal_set_time_limit(0);
+			$res = cmGetRuntime();
+			watchdog('controlm_fetch_runtimes', 'controlm_fetch_runtimes_cron ran');
+			variable_set('controlm_fetch_runtimes_next_execution', time() + $interval);
+		}
+	}
+}
+
+
+function cmGetRuntime() {
+	ini_set('memory_limit','1G');
+	ini_set('max_execution_time',0);
+
+	db_set_active('bip');
+
+	$return = "";
+
+	$end   = date('YmdHis',time());
+	$start = variable_get('controlm_fetch_runtimes_last_execution', date('YmdHis',time() - 86400));
+	$return .= "<p>Start time: ".$start."<br />End time: ".$end."</p>";
+
+	$client = new nusoap_client(variable_get('controlm_wsdl_client_url', ''), 'wsdl', false, false, false, false, 0, 600);
+
+	$err = $client->getError();
+	if ($err) {
+		$return = '<h2>Constructor error</h2><pre>' . $err . '</pre>';
+	} else {
+		$proxy = $client->getProxy();
+		$result = $proxy->runtime($start,$end);
+
+		if ($client->fault) {
+			$return = "Client fault";
+		} else {
+			$err = $client->getError();
+			if ($err) {
+				$return = "Client error: ".$err;
+			} else {
+				//$return .= "<pre>".print_r($result,TRUE)."</pre>";
+				foreach($result as $line) {
+					if(substr($line,0,1) == "2") {
+						$line = rtrim($line);
+						$vars = preg_split("/[ ]+/",$line);
+						$timestamp = substr($vars[0],0,4)."-".substr($vars[0],4,2)."-".substr($vars[0],6,2)." ".substr($vars[0],8,2).":".substr($vars[0],10,2).":".substr($vars[0],12,2);
+						if(count($vars) == 8) {
+							$memlib = "";
+							$cpu = $vars[6];
+							$elapsed = $vars[7];
+							$error=false;
+						} elseif(count($vars) != 9) {
+							$vars[0] = rtrim(substr($line,0,15));
+							$vars[1] = rtrim(substr($line,15,11));
+							$vars[2] = rtrim(substr($line,26,12));
+							$vars[3] = rtrim(substr($line,38,2));
+							$vars[4] = rtrim(substr($line,40,13));
+							$vars[5] = rtrim(substr($line,53,13));
+							$vars[6] = rtrim(substr($line,66,21));
+							$vars[7] = rtrim(substr($line,87,9));
+							$vars[8] = rtrim(substr($line,96));
+							$memlib = $vars[6];
+							$cpu = $vars[7];
+							$elapsed = $vars[8];
+							$error=false;
+							for ($i=0;$i<7;$i++) {
+								if(strlen($vars[$i]) > 0 && substr($vars[$i],0,1) == " ") {
+									$return .= "Could not decode line, var".$i."(".$vars[$i]."):<br />".$line."<br />";
+									watchdog('controlm_fetch_runtimes',"Could not decode line, var".$i."(".$vars[$i]."):<br />".$line."<br />");
+									$error=true;
+								}
+							}
+						} else {
+							$memlib = $vars[6];
+							$cpu = $vars[7];
+							$elapsed = $vars[8];
+							$error=false;
+						}
+
+						if(!$error) {
+							$keys = array(
+								'CMJR_TIMESTAMP' => $timestamp,
+								'CMJR_JOB_NAME' => $vars[1],
+								'CMJR_ORDER_ID' => substr($vars[2],0,8),
+								'CMJR_RUN' => $vars[3],
+								'CMJR_NODE_ID' => $vars[4],
+							);
+							$fields = array(
+								'CMJR_MEM_NAME' => $vars[5],
+								'CMJR_MEM_LIB' => $memlib,
+								'CMJR_CPU' => $cpu,
+								'CMJR_ELAPSED_TIME' => $elapsed,
+							);
+							$return .= "Job ".$vars[1].", order ID ".$vars[2].": ";
+							$write_stat = db_merge('cm_jobs_run')->key($keys)->fields($fields)->execute();
+							switch($write_stat) {
+								case 1:
+									$return .= "Inserted.<br />";
+									break;
+								case 2:
+									$return .= "Updated.<br />";
+									break;
+								default:
+									$return .= "Unexpected Result.<br />";
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	db_set_active();
+	variable_set('controlm_fetch_runtimes_last_execution', $end);
+	return($return);
+}
+

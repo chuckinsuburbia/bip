@@ -1,0 +1,6 @@
+name = Useful Functions
+description = This module contains useful functions used by other modules
+core = 7.x
+package = "anp_functions"
+
+version = "7.x-X.X"

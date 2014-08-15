@@ -1,0 +1,6 @@
+name = NuSOAP Include
+description = This module contains the NuSOAP code for external webservice calls
+core = 7.x
+package = "anp_functions"
+
+version = "7.x-X.X"

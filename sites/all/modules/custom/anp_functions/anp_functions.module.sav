@@ -1,0 +1,394 @@
+<?php
+
+function scGetAssignmentList() {
+	$sql = "SELECT swu_url,swu_type FROM sc_webservice_url WHERE swu_service='assignment'";
+	$result = db_query($sql);
+	$record = $result->fetchAll();
+	if(sizeOf($record) != 1) {
+		return("Error: unable to determine SC webservice URL");
+	} else {
+		$sc = $record[0];
+	}
+	if($sc->swu_type != "wsdl") {
+		return("Error: unknown SC webservice type");
+	}
+
+	require_once('includes/nusoap/lib/nusoap.php');
+	$client = new nusoap_client($sc->swu_url, $sc->swu_type, false, false, false, false, 0, 600);
+	$err = $client->getError();
+	if ($err) {
+		return('<h2>Constructor error</h2><pre>' . $err . '</pre>');
+	}
+	$client->setCredentials('pem', 'Pemspassword');
+
+	$query = '(AnpHelpdeskSelect="PC"|AnpHelpdeskSelect="STORE")';
+	$keys = new soapval('keys','AssignmentKeysType',"","http://servicecenter.peregrine.com/PWS",false,array("query" => $query));
+	$instance = new soapval("instance","AssignmentInstanceType","","http://servicecenter.peregrine.com/PWS");
+	$model = new soapval("model", "AssignmentModelType",array($keys,$instance),null,"http://servicecenter.peregrine.com/PWS");
+	$RetrieveAssignmentListRequest = new soapval("RetrieveAssignmentListRequest","RetrieveAssignmentListRequestType",$model,"http://servicecenter.peregrine.com/PWS");
+	$result = $client->call('RetrieveAssignmentList',$RetrieveAssignmentListRequest->serialize('literal'),"http://servicecenter.peregrine.com/PWS");
+
+	if ($client->fault) {
+		return("Client fault");
+	} else {
+		$err = $client->getError();
+		if ($err) {
+			return("Client error: ".$err);
+		} else {
+			return($result['instance']);
+		}
+	}
+}
+
+function scGetLocationList() {
+	$sql = "SELECT swu_url,swu_type FROM sc_webservice_url WHERE swu_service='config'";
+	$result = db_query($sql);
+	$record = $result->fetchAll();
+	if(sizeOf($record) != 1) {
+		return("Error: unable to determine SC webservice URL");
+	} else {
+		$sc = $record[0];
+	}
+	if($sc->swu_type != "wsdl") {
+		return("Error: unknown SC webservice type");
+	}
+
+	require_once('includes/nusoap/lib/nusoap.php');
+	$client = new nusoap_client($sc->swu_url, $sc->swu_type, false, false, false, false, 0, 600);
+	$err = $client->getError();
+	if ($err) {
+		return('<h2>Constructor error</h2><pre>' . $err . '</pre>');
+	}
+	$client->setCredentials('pem', 'Pemspassword');
+
+	$query = 'SiteCategory="STORE"&closed="false"';
+	$keys = new soapval('keys','ConfigurationKeysType',"","http://servicecenter.peregrine.com/PWS",false,array("query" => $query));
+	$instance = new soapval("instance","ConfigurationInstanceType","","http://servicecenter.peregrine.com/PWS");
+	$model = new soapval("model", "ConfigurationModelType",array($keys,$instance),null,"http://servicecenter.peregrine.com/PWS");
+	$RetrieveLocationListRequest = new soapval("RetrieveLocationListRequest","RetrieveLocationListRequestType",$model,"http://servicecenter.peregrine.com/PWS");
+	$result = $client->call('RetrieveLocationList',$RetrieveLocationListRequest->serialize('literal'),"http://servicecenter.peregrine.com/PWS");
+
+	if ($client->fault) {
+		return("Client fault");
+	} else {
+		$err = $client->getError();
+		if ($err) {
+			return("Client error: ".$err);
+		} else {
+			return($result['instance']);
+		}
+	}
+}
+
+function scGetTelecomList() {
+	$sql = "SELECT swu_url,swu_type FROM sc_webservice_url WHERE swu_service='config'";
+	$result = db_query($sql);
+	$record = $result->fetchAll();
+	if(sizeOf($record) != 1) {
+		return("Error: unable to determine SC webservice URL");
+	} else {
+		$sc = $record[0];
+	}
+	if($sc->swu_type != "wsdl") {
+		return("Error: unknown SC webservice type");
+	}
+
+	require_once('includes/nusoap/lib/nusoap.php');
+	$client = new nusoap_client($sc->swu_url, $sc->swu_type, false, false, false, false, 0, 600);
+	$err = $client->getError();
+	if ($err) {
+		return('<h2>Constructor error</h2><pre>' . $err . '</pre>');
+	}
+	$client->setCredentials('pem', 'Pemspassword');
+
+	$query = 'file.device,logical.name~=NULL';
+	$keys = new soapval('keys','ConfigurationKeysType',"","http://servicecenter.peregrine.com/PWS",false,array("query" => $query));
+	$instance = new soapval("instance","ConfigurationInstanceType","","http://servicecenter.peregrine.com/PWS");
+	$model = new soapval("model", "ConfigurationModelType",array($keys,$instance),null,"http://servicecenter.peregrine.com/PWS");
+	$RetrieveTelecommunicationDeviceListRequest = new soapval("RetrieveTelecommunicationDeviceListRequest","RetrieveTelecommunicationDeviceListRequestType",$model,"http://servicecenter.peregrine.com/PWS");
+	$result = $client->call('RetrieveTelecommunicationDeviceList',$RetrieveTelecommunicationDeviceListRequest->serialize('literal'),"http://servicecenter.peregrine.com/PWS");
+
+	if ($client->fault) {
+		return("Client fault");
+	} else {
+		$err = $client->getError();
+		if ($err) {
+			return("Client error: ".$err);
+		} else {
+			return($result['instance']);
+		}
+	}
+}
+
+function scGetStoreInven() {
+	$sql = "SELECT swu_url,swu_type FROM sc_webservice_url WHERE swu_service='inventory'";
+	$result = db_query($sql);
+	$record = $result->fetchAll();
+	if(sizeOf($record) != 1) {
+		return("Error: unable to determine SC webservice URL");
+	} else {
+		$sc = $record[0];
+	}
+	if($sc->swu_type != "wsdl") {
+		return("Error: unknown SC webservice type");
+	}
+
+	require_once('includes/nusoap/lib/nusoap.php');
+	$client = new nusoap_client($sc->swu_url, $sc->swu_type, false, false, false, false, 0, 600);
+	$err = $client->getError();
+	if ($err) {
+		return('<h2>Constructor error</h2><pre>' . $err . '</pre>');
+	}
+	$client->setCredentials('pem', 'Pemspassword');
+
+	$query = 'location~=NULL';
+	$keys = new soapval('keys','StoreInventoryKeysType',"","http://servicecenter.peregrine.com/PWS",false,array("query" => $query));
+	$instance = new soapval("instance","StoreInventoryInstanceType","","http://servicecenter.peregrine.com/PWS");
+	$model = new soapval("model", "StoreInventoryModelType",array($keys,$instance),null,"http://servicecenter.peregrine.com/PWS");
+	$RetrieveAnpstoreinvenListRequest = new soapval("RetrieveAnpstoreinvenListRequest","RetrieveAnpstoreinvenListRequestType",$model,"http://servicecenter.peregrine.com/PWS");
+	$result = $client->call('RetrieveAnpstoreinvenList',$RetrieveAnpstoreinvenListRequest->serialize('literal'),"http://servicecenter.peregrine.com/PWS");
+
+	if ($client->fault) {
+		return("Client fault");
+	} else {
+		$err = $client->getError();
+		if ($err) {
+			return("Client error: ".$err);
+		} else {
+			return($result['instance']);
+		}
+	}
+}
+
+function scGroupUpdate() {
+	$mailto = variable_get('site_mail', ini_get('sendmail_from'));
+
+	$sql = "select distinct cmsu_group from cm_sc_users order by cmsu_group";
+	$result = db_query($sql);
+	$rs_groups = $result->fetchAll();
+	foreach($rs_groups as $g) {
+		$fileGroups[] = $g->cmsu_group;
+	}
+
+	$sql = "select * from cm_assignment_groups order by cmag_sc_group";
+	$result = db_query($sql);
+	$rs_groups = $result->fetchAll();
+	foreach($rs_groups as $g) {
+		$dbGroups[] = $g->CMAG_SC_GROUP;
+		$groupId[$g->CMAG_SC_GROUP] = (array) $g;
+	}
+
+        if(is_array($dbGroups)){
+                $newGroups = array_diff($fileGroups, $dbGroups);
+                $delGroups = array_diff($dbGroups, $fileGroups);
+        }else{
+                $newGroups = $fileGroups;
+        }
+
+        //load new groups
+        if(is_array($newGroups)){
+                foreach($newGroups as $group){
+                        if(!empty($group)){
+                                $sql = "insert into cm_assignment_groups values(NULL,'".addslashes($group)."','','')";
+				db_query($sql);
+                                $sql = "insert into ap_rollout_control (aprc_group) values('".addslashes($group)."')";
+				db_query($sql);
+                        }
+                }
+        }
+        //handle deleted groups
+        if(is_array($delGroups)){
+                foreach($delGroups as $group){
+                        $sql = "select * from cm_job_desc, cm_job_info where cmjd_job_name = cmji_job_name and cmjd_node_id = cmji_node_id and cmjd_asnmt_group = ".$groupId[$group]['CMAG_ID'];
+			$result = db_query($sql);
+			$rs_check = $result->fetchAll();
+
+                        if(sizeOf($rs_check)>0){  //uh oh group was deleted but we have jobs assigned to it
+                                $errorGroups[] = implode(" - ",$groupId[$group]);
+                        }else{
+                                $sql = "DELETE from cm_assignment_groups where cmag_id = ".$groupId[$group]['CMAG_ID'];
+				db_query($sql);
+                                //alarmpoint rollout
+                                $sqlstr = "DELETE from ap_rollout_control where aprc_group = '".$group."'";
+				db_query($sql);
+                        }
+                }
+        }
+
+        if(isset($errorGroups)){
+                        $sql = "select cmjd_job_name from cm_job_desc, cm_job_info where cmjd_job_name = cmji_job_name and cmjd_node_id = cmji_node_id and cmjd_asnmt_group in ('".implode("','",$errorGroups)."')";
+			$result = db_query($sql);
+			$rs_probjobs = $result->fetchAll();
+			foreach($rs_probjobs as $j) {
+				$probjobs[] = $j->cmjd_job_name;
+			}
+                        mail($mailto,"Service Center Group can't be deleted!","The following groups were deleted/changed in SC, but are assigned to jobs in BIP\n\nDELETED:\n\n".implode("\n",$errorGroups)."\n\n These groups were added so check for new name.\n\n".implode("\n",$newGroups)."\n\nJobs with issues:\n\n".implode("\n",$probjobs),"From: Batch Information Portal");
+        }
+}
+
+function scGroupSupervisorCheck() {
+	$mailto = variable_get('site_mail', ini_get('sendmail_from'));
+	$subject="AP Supervisor Deleted";
+	$message = "The following individuals are no longer listed as supervisors in AlarmPoint. The groups they belong to need to have a new supervisor assigned to it. ";
+	$message.= "The user(s) may need to be deleted from the Alarmpoint system directly.\n\nUser:           Group:";
+	
+	$sql="SELECT * FROM cm_assignment_groups where cmag_supervisor is not null and cmag_supervisor not in (select cmsu_user from cm_sc_users) order by cmag_sc_group";
+	$result = db_query($sql);
+	$rs_groups = $result->fetchAll();
+
+	
+	$gtg=false;
+	foreach($rs_groups as $g) {
+		if(!empty($g->CMAG_SUPERVISOR)) { $gtg=true; }
+		$message.="\n".$g->CMAG_SUPERVISOR.'             '.$g->CMAG_SC_GROUP."\n";
+	}
+	
+	if($gtg) {
+		mail($to, $subject, $message);
+	}
+}
+
+
+function cmGetExport() {
+	ini_set('memory_limit','1G');
+	ini_set('max_execution_time',0);
+	require_once('includes/nusoap/lib/nusoap.php');
+	db_set_active('bip');
+
+	$dbTables = array("cm_job_info","cm_sched_table","cm_job_properties","cm_prop_types","cm_job_on_properties","cm_on_types");
+	$return = "";
+
+	$client = new nusoap_client('https://controlm/webservice/?wsdl', 'wsdl', false, false, false, false, 0, 600);
+	$err = $client->getError();
+	if ($err) return('<h2>Constructor error</h2><pre>' . $err . '</pre>');
+	
+	$proxy = $client->getProxy();
+	$url = $proxy->runExport();
+	//$url = "https://controlm/webservice/opsys.xml";
+
+	if ($client->fault) return("Client fault");
+	$err = $client->getError();
+	if ($err) return("Client error: ".$err);
+
+	$contents = file_get_contents($url);
+	$ctmExport = object_to_array(new SimpleXMLElement($contents));
+	unset($contents);
+
+	foreach($dbTables as $tbl) {
+		$return .= "Backing up table ".$tbl."...";
+		dbTblBackup($tbl);
+		$return .= "Done<br />Truncating table ".$tbl."...";
+		dbTblEmpty($tbl);
+		$return .= "Done<br />";
+	}
+
+	foreach($ctmExport['SCHED_TABLE'] as $table) {
+		foreach($table['@attributes'] as $k => $v) {
+			if($k == "LAST_UPLOAD") $v = date('Y-m-d H:i:s',strtotime($v));
+			$att['CMT_'.$k] = $v;
+		}
+		$return .= "Inserting schedule table ".$table['@attributes']['TABLE_NAME']." into cm_sched_table...";
+		$tblInsId = db_insert('cm_sched_table')->fields($att)->execute();
+		$return .= "Done<br />";
+		unset($att);
+
+		foreach($table['JOB'] as $job) {
+			if(!isset($job['@attributes']) || !isset($job['@attributes']['JOBNAME'])) continue;
+			foreach($job['@attributes'] as $k => $v) {
+				$att['CMJI_'.$k] = $v;
+			}
+			$att['CMJI_TABLE_ID'] = $tblInsId;
+			$return .= "&nbsp;&nbsp;Inserting job ".$job['@attributes']['JOBNAME']." into cm_job_info...";
+			$jobInsId = db_insert('cm_job_info')->fields($att)->execute();
+			$return .= "Done<br />";
+			unset($att);
+
+			unset($job['@attributes']);
+			foreach($job as $property => $attributes) {
+				if(isset($attributes['@attributes'])) {
+					cmInsertJobProperty($attributes,$property,$jobInsId,$known_attr,$known_attr_on,$return);
+				} else {
+					foreach($attributes as $num => $attr) {
+						cmInsertJobProperty($attr,$property,$jobInsId,$known_attr,$known_attr_on,$return,$num);
+					}
+				}
+			}
+		}
+	}
+	db_set_active();
+	return $return;
+}
+function cmInsertJobProperty($attributes,$property,$jobInsId,&$known_attr,&$known_attr_on,&$return,$num=0) {
+	foreach($attributes['@attributes'] as $k => $v) {
+		if(isset($known_attr[$property][$k])) {
+			$typeInsId = $known_attr[$property][$k]['id'];
+		} else {
+			$data = array(
+				'CMPT_TYPE_NAME' => $property,
+				'CMPT_VAR' => $k);
+			$typeInsId = db_insert('cm_prop_types')->fields($data)->execute();
+			$known_attr[$property][$k]['id'] = $typeInsId;
+		}
+		$return .= "&nbsp;&nbsp;&nbsp;&nbsp;Inserting job property ".$property."/".$k."/".$v." into cm_job_properties...";
+		$data = array(
+			'CMJP_JOB_ID' => $jobInsId,
+			'CMJP_TYPE' => $typeInsId,
+			'CMJP_VALUE' => $v,
+			'CMJP_NUM' => $num);
+		db_insert('cm_job_properties')->fields($data)->execute();
+		$return .= "Done<br />";
+	}
+	if($property == "ON") {
+		unset($attributes['@attributes']);
+		foreach($attributes as $onKey => $onStuff) {
+			if(isset($onStuff['@attributes'])) {
+				cmInsertOnProperty($onStuff,$onKey,$jobInsId,$typeInsId,$known_attr_on,$return);
+			} else {
+				foreach($onStuff as $onNum => $onAttr) {
+					cmInsertOnProperty($onStuff,$onKey,$jobInsId,$typeInsId,$known_attr_on,$return,$onNum);
+				}
+			}
+		}
+	}
+}
+function cmInsertOnProperty($attributes,$onKey,$jobInsId,$typeInsId,&$known_attr_on,&$return,$num=0,$subnum=0) {
+	if(isset($attributes['@attributes'])) {
+		foreach($attributes['@attributes'] as $k => $v) {
+			if(isset($known_attr_on[$onKey][$k])) {
+				$onInsId = $known_attr_on[$onKey][$k]['id'];
+			} else {
+				$data = array(
+					'CMOT_TYPE_NAME' => $onKey,
+					'CMOT_VAR' => $k);
+				$onInsId = db_insert('cm_on_types')->fields($data)->execute();
+				$known_attr_on[$onKey][$k]['id'] = $onInsId;
+			}
+			$return .= "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Inserting job ON property ".$onKey."/".$k."/".$v." into cm_job_on_properties...";
+			$data = array(
+				'CMJOP_JOB_ID' => $jobInsId,
+				'CMJOP_PROP_TYPE' => $typeInsId,
+				'CMJOP_ON_TYPE' => $onInsId,
+				'CMJOP_VALUE' => $v,
+				'CMJOP_NUM' => $num,
+				'CMJOP_SUBNUM' => $subnum);
+			db_insert('cm_job_on_properties')->fields($data)->execute();
+			$return .= "Done<br />";
+		}
+	} else {
+		foreach($attributes as $subNum =>$attr) {
+			cmInsertOnProperty($attr,$onKey,$jobInsId,$typeInsId,$known_attr_on,$return,$num,$subNum);
+		}
+	}
+}
+
+
+
+function object_to_array($obj) {
+        $_arr = is_object($obj) ? (array) $obj : $obj;
+        foreach ($_arr as $key => $val) {
+                $val = (is_array($val) || is_object($val)) ? object_to_array($val) : $val;
+                $arr[$key] = $val;
+        }
+        return $arr;
+}
+

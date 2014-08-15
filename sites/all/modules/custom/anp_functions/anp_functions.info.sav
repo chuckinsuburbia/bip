@@ -1,0 +1,6 @@
+name = A&P Function Library
+description = This module contains A&P specific PHP helper functions.
+core = 7.x
+package = "anp_functions"
+
+version = "7.x-X.X"

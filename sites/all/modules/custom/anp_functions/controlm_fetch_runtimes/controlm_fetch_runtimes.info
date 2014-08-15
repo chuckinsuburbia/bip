@@ -1,0 +1,9 @@
+name = Control-M Fetch Runtimes
+description = This module contains functions to fetch the job run times from Control-M
+core = 7.x
+package = "anp_functions"
+configure = admin/config/services/controlm_fetch_runtimes
+dependencies[] = controlm_wsdl_client
+dependencies[] = db_table_backup
+
+version = "7.x-X.X"

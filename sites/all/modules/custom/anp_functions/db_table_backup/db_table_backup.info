@@ -1,0 +1,6 @@
+name = Database Table Backup
+description = This module contains functions take a backup of a Db table, keeping the previous x number of backups
+core = 7.x
+package = "anp_functions"
+
+version = "7.x-X.X"

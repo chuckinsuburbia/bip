@@ -1,0 +1,23 @@
+<?php
+
+function dbTblBackup($src,$num_backups=4) {
+	for($i = 1; $i < $num_backups; $i++) {
+		$sql = "CREATE TABLE IF NOT EXISTS ".$src."_backup_".$i." LIKE ".$src;
+		db_query($sql);
+	}
+	$sql = "DROP TABLE IF EXISTS ".$src."_backup_".$num_backups;
+	db_query($sql);
+	for($i = $num_backups; $i >= 2; $i--) {
+		$sql = "RENAME TABLE ".$src."_backup_".($i - 1)." TO ".$src."_backup_".$i;
+		db_query($sql);
+	}
+	$sql = "CREATE TABLE ".$src."_backup_1 LIKE ".$src;
+	db_query($sql);
+	$sql = "INSERT INTO ".$src."_backup_1 SELECT * FROM ".$src;
+	db_query($sql);
+}
+function dbTblEmpty($tbl) {
+	$sql = "TRUNCATE TABLE ".$tbl;
+	db_query($sql);
+}
+

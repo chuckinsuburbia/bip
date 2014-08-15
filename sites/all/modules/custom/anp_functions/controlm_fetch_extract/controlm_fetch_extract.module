@@ -1,0 +1,208 @@
+<?php
+
+function controlm_fetch_extract_menu () {
+	$items = array();
+	$items['admin/config/services/controlm_fetch_extract'] = array(
+		'title' => 'Control-M Fetch Extract',
+		'description' => 'Configuration for Control-M Fetch Extract module',
+		'page callback' => 'drupal_get_form',
+		'page arguments' => array('controlm_fetch_extract_form'),
+		'access arguments' => array('access administration pages'),
+		'type' => MENU_NORMAL_ITEM,
+	);
+	$items['controlm/fetch_extract'] = array(
+		'title' => 'Fetch Extract Data',
+		'page callback' => 'controlm_fetch_extract_execute',
+		'access arguments' => array('access administration pages'),
+		'type' => MENU_NORMAL_ITEM,
+	);
+	return $items;
+}
+function controlm_fetch_extract_execute() {
+  return array('#markup' => '<p>' . t(cmGetExport()) . '</p>');
+}
+function controlm_fetch_extract_form ($form, &$form_state) {
+	$form['controlm_fetch_extract_cron'] = array(
+		'#type' => 'checkbox',
+		'#title' => t('Run during Cron?'),
+		'#default_value' => variable_get('controlm_fetch_extract_cron',1),
+		'#description' => t('Do we want to run the fetch periodically through cron?'),
+		'#required' => FALSE,
+	);
+	$form['controlm_fetch_extract_interval'] = array(
+		'#type' => 'textfield',
+		'#title' => t('Cron Interval'),
+		'#default_value' => variable_get('controlm_fetch_extract_interval',3600),
+		'#size' => 10,
+		'#maxlength' => 10,
+		'#description' => t('The number of seconds between Cron executions.'),
+		'#required' => TRUE,
+	);
+	return system_settings_form($form);
+}
+function controlm_fetch_extract_form_validate ($form, &$form_state) {
+	if(!ctype_digit(strval($form_state['values']['controlm_fetch_extract_interval']))) {
+		form_set_error('controlm_fetch_extract_interval', t('Interval value must be an integer.'));
+	}
+	if($form_state['values']['controlm_fetch_extract_interval'] <= 0) {
+		form_set_error('controlm_fetch_extract_interval', t('Interval value must be greater than zero.'));
+	}
+}
+function controlm_fetch_extract_cron() {
+	$enabled = variable_get('controlm_fetch_extract_cron',0);
+	if($enabled = 1) {
+		$interval = variable_get('controlm_fetch_extract_interval',3600);
+		if (time() >= variable_get('controlm_fetch_extract_cron_next_execution', 0)) {
+			drupal_set_time_limit(0);
+			$res = cmGetExport();
+			watchdog('controlm_fetch_extract', 'controlm_fetch_extract_cron ran');
+			variable_set('controlm_fetch_extract_cron_next_execution', time() + $interval);
+		}
+	}
+}
+
+
+function cmGetExport() {
+	ini_set('memory_limit','1G');
+	ini_set('max_execution_time',0);
+	db_set_active('bip');
+
+	$dbTables = array("cm_job_info","cm_sched_table","cm_job_properties","cm_prop_types","cm_job_on_properties","cm_on_types");
+	$return = "";
+
+	//$client = new nusoap_client('https://controlm/webservice/?wsdl', 'wsdl', false, false, false, false, 0, 600);
+	$client = new nusoap_client(variable_get('controlm_wsdl_client_url', ''), 'wsdl', false, false, false, false, 0, 600);
+	$err = $client->getError();
+	if ($err) return('<h2>Constructor error</h2><pre>' . $err . '</pre>');
+	
+	$proxy = $client->getProxy();
+	$url = $proxy->runExport();
+	//$url = "https://controlm/webservice/opsys.xml";
+
+	if ($client->fault) return("Client fault");
+	$err = $client->getError();
+	if ($err) return("Client error: ".$err);
+
+	$contents = file_get_contents($url);
+	$ctmExport = object_to_array(new SimpleXMLElement($contents));
+	unset($contents);
+
+	foreach($dbTables as $tbl) {
+		$return .= "Backing up table ".$tbl."...";
+		dbTblBackup($tbl);
+		$return .= "Done<br />Truncating table ".$tbl."...";
+		dbTblEmpty($tbl);
+		$return .= "Done<br />";
+	}
+
+	foreach($ctmExport['SCHED_TABLE'] as $table) {
+		foreach($table['@attributes'] as $k => $v) {
+			if($k == "LAST_UPLOAD") $v = date('Y-m-d H:i:s',strtotime($v));
+			$att['CMT_'.$k] = $v;
+		}
+		$return .= "Inserting schedule table ".$table['@attributes']['TABLE_NAME']." into cm_sched_table...";
+		$tblInsId = db_insert('cm_sched_table')->fields($att)->execute();
+		$return .= "Done<br />";
+		unset($att);
+
+		foreach($table['JOB'] as $job) {
+			if(!isset($job['@attributes']) || !isset($job['@attributes']['JOBNAME'])) continue;
+			foreach($job['@attributes'] as $k => $v) {
+				$att['CMJI_'.$k] = $v;
+			}
+			$att['CMJI_TABLE_ID'] = $tblInsId;
+			$return .= "&nbsp;&nbsp;Inserting job ".$job['@attributes']['JOBNAME']." into cm_job_info...";
+			$jobInsId = db_insert('cm_job_info')->fields($att)->execute();
+			$return .= "Done<br />";
+			unset($att);
+
+			unset($job['@attributes']);
+			foreach($job as $property => $attributes) {
+				if(isset($attributes['@attributes'])) {
+					cmInsertJobProperty($attributes,$property,$jobInsId,$known_attr,$known_attr_on,$return);
+				} else {
+					foreach($attributes as $num => $attr) {
+						cmInsertJobProperty($attr,$property,$jobInsId,$known_attr,$known_attr_on,$return,$num);
+					}
+				}
+			}
+		}
+	}
+	db_set_active();
+	$return .= "<p>Processing Complete</p>";
+	return $return;
+}
+function cmInsertJobProperty($attributes,$property,$jobInsId,&$known_attr,&$known_attr_on,&$return,$num=0) {
+	foreach($attributes['@attributes'] as $k => $v) {
+		if(isset($known_attr[$property][$k])) {
+			$typeInsId = $known_attr[$property][$k]['id'];
+		} else {
+			$data = array(
+				'CMPT_TYPE_NAME' => $property,
+				'CMPT_VAR' => $k);
+			$typeInsId = db_insert('cm_prop_types')->fields($data)->execute();
+			$known_attr[$property][$k]['id'] = $typeInsId;
+		}
+		$return .= "&nbsp;&nbsp;&nbsp;&nbsp;Inserting job property ".$property."/".$k."/".$v." into cm_job_properties...";
+		$data = array(
+			'CMJP_JOB_ID' => $jobInsId,
+			'CMJP_TYPE' => $typeInsId,
+			'CMJP_VALUE' => $v,
+			'CMJP_NUM' => $num);
+		db_insert('cm_job_properties')->fields($data)->execute();
+		$return .= "Done<br />";
+	}
+	if($property == "ON") {
+		unset($attributes['@attributes']);
+		foreach($attributes as $onKey => $onStuff) {
+			if(isset($onStuff['@attributes'])) {
+				cmInsertOnProperty($onStuff,$onKey,$jobInsId,$typeInsId,$known_attr_on,$return);
+			} else {
+				foreach($onStuff as $onNum => $onAttr) {
+					cmInsertOnProperty($onStuff,$onKey,$jobInsId,$typeInsId,$known_attr_on,$return,$onNum);
+				}
+			}
+		}
+	}
+}
+function cmInsertOnProperty($attributes,$onKey,$jobInsId,$typeInsId,&$known_attr_on,&$return,$num=0,$subnum=0) {
+	if(isset($attributes['@attributes'])) {
+		foreach($attributes['@attributes'] as $k => $v) {
+			if(isset($known_attr_on[$onKey][$k])) {
+				$onInsId = $known_attr_on[$onKey][$k]['id'];
+			} else {
+				$data = array(
+					'CMOT_TYPE_NAME' => $onKey,
+					'CMOT_VAR' => $k);
+				$onInsId = db_insert('cm_on_types')->fields($data)->execute();
+				$known_attr_on[$onKey][$k]['id'] = $onInsId;
+			}
+			$return .= "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Inserting job ON property ".$onKey."/".$k."/".$v." into cm_job_on_properties...";
+			$data = array(
+				'CMJOP_JOB_ID' => $jobInsId,
+				'CMJOP_PROP_TYPE' => $typeInsId,
+				'CMJOP_ON_TYPE' => $onInsId,
+				'CMJOP_VALUE' => $v,
+				'CMJOP_NUM' => $num,
+				'CMJOP_SUBNUM' => $subnum);
+			db_insert('cm_job_on_properties')->fields($data)->execute();
+			$return .= "Done<br />";
+		}
+	} else {
+		foreach($attributes as $subNum =>$attr) {
+			cmInsertOnProperty($attr,$onKey,$jobInsId,$typeInsId,$known_attr_on,$return,$num,$subNum);
+		}
+	}
+}
+
+
+
+function object_to_array($obj) {
+        $_arr = is_object($obj) ? (array) $obj : $obj;
+        foreach ($_arr as $key => $val) {
+                $val = (is_array($val) || is_object($val)) ? object_to_array($val) : $val;
+                $arr[$key] = $val;
+        }
+        return $arr;
+}
+
