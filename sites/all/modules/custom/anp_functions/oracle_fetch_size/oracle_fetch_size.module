@@ -54,7 +54,7 @@ function oracle_fetch_size_cron() {
 		$interval = variable_get('oracle_fetch_size_interval',3600);
 		if (time() >= variable_get('oracle_fetch_size_next_execution', 0)) {
 			drupal_set_time_limit(0);
-			//$res = cmCalcTrending();
+			$res = oraFetchSize();
 			watchdog('oracle_fetch_size', 'oracle_fetch_size_cron ran');
 			variable_set('oracle_fetch_size_next_execution', time() + $interval);
 		}
@@ -80,8 +80,8 @@ function oraFetchSize() {
 			group by owner,segment_name,segment_type
 			order by 4 desc";
 		$result = oci8_db_query($query);
-		$return .= "<pre>".print_r($result,TRUE)."</pre>";
 		while($rec = $result->fetchAssoc()) {
+			$return .= "<pre>".print_r($rec,TRUE)."</pre>";
 			$keys = array(
 				'oss_db' => $dbname,
 				'oss_owner' => $rec['OWNER'],

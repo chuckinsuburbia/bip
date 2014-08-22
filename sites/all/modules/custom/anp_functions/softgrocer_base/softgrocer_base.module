@@ -1,0 +1,16 @@
+<?php
+
+function softgrocer_base_menu () {
+	$items = array();
+	$items['softgrocer'] = array(
+		'title' => 'SoftGrocer',
+		'page callback' => 'softgrocer_base_description',
+		'access callback' => TRUE,
+		'expanded' => TRUE,
+	);
+	return $items;
+}
+function softgrocer_base_description() {
+  return array('#markup' => '<p>' . t('Place Holder') . '</p>');
+}
+

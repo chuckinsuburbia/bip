@@ -1,0 +1,10 @@
+name = Control-M View Job List
+description = This module contains forms to view Control-M jobs in the local DB
+core = 7.x
+package = "anp_functions"
+configure = admin/config/services/controlm_view_job_list
+dependencies[] = controlm_fetch_extract
+dependencies[] = controlm_fetch_runtimes
+dependencies[] = controlm_fetch_job_stats
+
+version = "7.x-X.X"

@@ -1,0 +1,114 @@
+<?php
+
+function controlm_fetch_job_stats_menu () {
+	$items = array();
+	$items['admin/config/services/controlm_fetch_job_stats'] = array(
+		'title' => 'Control-M Fetch Job Stats',
+		'description' => 'Configuration for Control-M Fetch Job Stats module',
+		'page callback' => 'drupal_get_form',
+		'page arguments' => array('controlm_fetch_job_stats_form'),
+		'access arguments' => array('access administration pages'),
+		'type' => MENU_NORMAL_ITEM,
+	);
+	$items['controlm/fetch_job_stats'] = array(
+		'title' => 'Fetch Job Stats',
+		'page callback' => 'controlm_fetch_job_stats_execute',
+		'access arguments' => array('access administration pages'),
+		'type' => MENU_NORMAL_ITEM,
+	);
+	return $items;
+}
+function controlm_fetch_job_stats_execute() {
+  return array('#markup' => '<p>' . t(cmGetJobStats()) . '</p>');
+}
+function controlm_fetch_job_stats_form ($form, &$form_state) {
+	$form['controlm_fetch_job_stats_cron'] = array(
+		'#type' => 'checkbox',
+		'#title' => t('Run during Cron?'),
+		'#default_value' => variable_get('controlm_fetch_job_stats_cron',1),
+		'#description' => t('Do we want to run the fetch periodically through cron?'),
+		'#required' => FALSE,
+	);
+	$form['controlm_fetch_job_stats_interval'] = array(
+		'#type' => 'textfield',
+		'#title' => t('Cron Interval'),
+		'#default_value' => variable_get('controlm_fetch_job_stats_interval',3600),
+		'#size' => 10,
+		'#maxlength' => 10,
+		'#description' => t('The number of seconds between Cron executions.'),
+		'#required' => TRUE,
+	);
+	return system_settings_form($form);
+}
+function controlm_fetch_job_stats_form_validate ($form, &$form_state) {
+	if(!ctype_digit(strval($form_state['values']['controlm_fetch_job_stats_interval']))) {
+		form_set_error('controlm_fetch_job_stats_interval', t('Interval value must be an integer.'));
+	}
+	if($form_state['values']['controlm_fetch_job_stats_interval'] <= 0) {
+		form_set_error('controlm_fetch_job_stats_interval', t('Interval value must be greater than zero.'));
+	}
+}
+function controlm_fetch_job_stats_cron() {
+	$enabled = variable_get('controlm_fetch_job_stats_cron',0);
+	if($enabled = 1) {
+		$interval = variable_get('controlm_fetch_job_stats_interval',3600);
+		if (time() >= variable_get('controlm_fetch_job_stats_next_execution', 0)) {
+			drupal_set_time_limit(0);
+			$res = cmGetJobStats();
+			watchdog('controlm_fetch_job_stats', 'controlm_fetch_job_stats_cron ran');
+			variable_set('controlm_fetch_job_stats_next_execution', time() + $interval);
+		}
+	}
+}
+
+
+function cmGetJobStats() {
+	ini_set('memory_limit','1G');
+	ini_set('max_execution_time',0);
+
+	db_set_active('bip');
+
+	$return = "";
+
+	$odate = date('ymd');
+	$return .= $odate."<br />";
+
+	$client = new nusoap_client(variable_get('controlm_wsdl_client_url', ''), 'wsdl', false, false, false, false, 0, 600);
+	$err = $client->getError();
+	if ($err) {
+		die( '<h2>Constructor error</h2><pre>' . $err . '</pre>');
+	}
+	$proxy = $client->getProxy();
+
+	$result = $proxy->getJobStats('140819');
+	if ($client->fault) {
+		$return = "Client fault";
+	} else {
+		$err = $client->getError();
+		if ($err) {
+			$return = "Client error: ".$err;
+		} else {
+			//$return .= "<pre>".print_r($result,TRUE)."</pre>";
+			$return .= "Backing up table cm_job_status...";
+			dbTblBackup('cm_job_status');
+			$return .= "Done<br />Truncating table cm_job_status...";
+			dbTblEmpty('cm_job_status');
+			$return .= "Done<br />";
+
+			foreach($result as $job) {
+				foreach($job as $k => $v) {
+					if($v != ' ') {
+						$data['cmjs_'.$k] = $v;
+					}
+				}
+				$return .= "Insert job ".$job['job_name'].", order ID ".$job['order_id']."<br />";
+				db_insert('cm_job_status')->fields($data)->execute();
+				unset($data);
+			}
+		}
+	}
+
+	db_set_active();
+	return($return);
+}
+

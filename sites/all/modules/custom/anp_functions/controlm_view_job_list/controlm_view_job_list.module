@@ -1,0 +1,127 @@
+<?php
+
+function controlm_view_job_list_menu () {
+	$items = array();
+	$items['controlm/view_job_list'] = array(
+		'title' => 'View Job List',
+		'page callback' => 'controlm_view_job_list_execute',
+		'access arguments' => array('access content'),
+		'type' => MENU_NORMAL_ITEM,
+	);
+	return $items;
+}
+function controlm_view_job_list_execute() {
+	$arr = drupal_get_form('controlm_view_job_list_form');
+	$markup = drupal_render($arr);
+	return array('#markup' => '<p>' . t($markup) . '</p>');
+}
+function controlm_view_job_list_form ($form, &$form_state) {
+	$form = array();
+	$form['cmji_jobname'] = array(
+		'#title' => t('Job Name'),
+		'#type' => 'textfield',
+	);
+	$form['cmji_nodeid'] = array(
+		'#title' => t('Node'),
+		'#type' => 'textfield',
+	);
+	$form['cmji_description'] = array(
+		'#title' => t('Description'),
+		'#type' => 'textfield',
+	);
+	$form['cmji_cmdline'] = array(
+		'#title' => t('Command Line'),
+		'#type' => 'textfield',
+	);
+	$form['cmji_owner'] = array(
+		'#title' => t('Owner'),
+		'#type' => 'textfield',
+	);
+	$form['cmji_weekscal'] = array(
+		'#title' => t('Weekdays Calendar'),
+		'#type' => 'textfield',
+	);
+	$form['cmji_dayscal'] = array(
+		'#title' => t('Month Days Calendar'),
+		'#type' => 'textfield',
+	);
+	$form['cmji_confcal'] = array(
+		'#title' => t('ConfCal'),
+		'#type' => 'textfield',
+	);
+	$form['cmji_application'] = array(
+		'#title' => t('CTM Application'),
+		'#type' => 'textfield',
+	);
+	$form['cmji_group'] = array(
+		'#title' => t('CTM Group'),
+		'#type' => 'textfield',
+	);
+	$form['orderby_options'] = array(
+		'#type' => 'value',
+		'#value' => array(
+			'cmji_jobname' => t('Job Name'),
+			'cmji_nodeid' => t('Node'),
+			'cmji_description' => t('Description'),
+		),
+	);
+	$form['orderby'] = array(
+		'#title' => t('Order results by'),
+		'#type' => 'select',
+		'#options' => $form['orderby_options']['#value'],
+	);
+	$form['submit'] = array(
+		'#value' => t('Search'),
+		'#type' => 'submit',
+		'#submit' => array('controlm_view_job_list_form_submit'),
+	);
+
+	if(isset($form_state['storage']['results'])) {
+		$form['results'] = $form_state['storage']['results'];
+	}
+
+	return $form;
+}
+function controlm_view_job_list_form_submit ($form, &$form_state) {
+	db_set_active('bip');
+
+	$orderby = $form_state['values']['orderby'];
+	foreach($form_state['values'] as $k => $v) {
+		if(!(strstr($k,'cmji_') || strstr($k,'cmjp_')) || $v == '') {
+			continue;
+		}
+		$where[$k] = $v;
+	}
+
+	$table = array(
+		'#theme' => 'table',
+		'#header' => array(t('Job Name'),t('Node'),t('Description')),
+		'#rows' => array(),
+	);
+
+	//$table['#rows'][] = array('test','test2','test3');
+	$query = db_select('cm_job_info','cmji');
+	$query->fields('cmji',array('cmji_jobname','cmji_nodeid','cmji_description','cmji_table_id'));
+	if(isset($where)) {
+		foreach($where as $k => $v) {
+			$query->condition($k,'%'.$v.'%','LIKE');
+		}
+	}
+	$query->orderBy($orderby);
+	$result = $query->execute();
+
+	while($row = $result->fetchAssoc()) {
+		$table['#rows'][] = array(
+			t($row['cmji_jobname']),
+			t($row['cmji_nodeid']),
+			t($row['cmji_description']),
+		);
+	}
+
+	$form_state['storage']['results'] = $table;
+	$form_state['rebuild'] = TRUE;
+
+	db_set_active();
+	return $table;
+}
+

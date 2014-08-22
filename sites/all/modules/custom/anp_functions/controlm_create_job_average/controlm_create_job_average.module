@@ -1,0 +1,93 @@
+<?php
+
+function controlm_create_job_average_menu () {
+	$items = array();
+	$items['admin/config/services/controlm_create_job_average'] = array(
+		'title' => 'Control-M Create Job Averages Table',
+		'description' => 'Configuration for Control-M Create Job Averages module',
+		'page callback' => 'drupal_get_form',
+		'page arguments' => array('controlm_create_job_average_form'),
+		'access arguments' => array('access administration pages'),
+		'type' => MENU_NORMAL_ITEM,
+	);
+	$items['controlm/create_job_average'] = array(
+		'title' => 'Create Job Averages Table',
+		'page callback' => 'controlm_create_job_average_execute',
+		'access arguments' => array('access administration pages'),
+		'type' => MENU_NORMAL_ITEM,
+	);
+	return $items;
+}
+function controlm_create_job_average_execute() {
+  return array('#markup' => '<p>' . t(cmCreateJobAvg()) . '</p>');
+}
+function controlm_create_job_average_form ($form, &$form_state) {
+	$form['controlm_create_job_average_cron'] = array(
+		'#type' => 'checkbox',
+		'#title' => t('Run during Cron?'),
+		'#default_value' => variable_get('controlm_create_job_average_cron',1),
+		'#description' => t('Do we want to run the fetch periodically through cron?'),
+		'#required' => FALSE,
+	);
+	$form['controlm_create_job_average_interval'] = array(
+		'#type' => 'textfield',
+		'#title' => t('Cron Interval'),
+		'#default_value' => variable_get('controlm_create_job_average_interval',3600),
+		'#size' => 10,
+		'#maxlength' => 10,
+		'#description' => t('The number of seconds between Cron executions.'),
+		'#required' => TRUE,
+	);
+	return system_settings_form($form);
+}
+function controlm_create_job_average_form_validate ($form, &$form_state) {
+	if(!ctype_digit(strval($form_state['values']['controlm_create_job_average_interval']))) {
+		form_set_error('controlm_create_job_average_interval', t('Interval value must be an integer.'));
+	}
+	if($form_state['values']['controlm_create_job_average_interval'] <= 0) {
+		form_set_error('controlm_create_job_average_interval', t('Interval value must be greater than zero.'));
+	}
+}
+function controlm_create_job_average_cron() {
+	$enabled = variable_get('controlm_create_job_average_cron',0);
+	if($enabled = 1) {
+		$interval = variable_get('controlm_create_job_average_interval',3600);
+		if (time() >= variable_get('controlm_create_job_average_next_execution', 0)) {
+			drupal_set_time_limit(0);
+			$res = cmCreateJobAvg();
+			watchdog('controlm_create_job_average', 'controlm_create_job_average_cron ran');
+			variable_set('controlm_create_job_average_next_execution', time() + $interval);
+		}
+	}
+}
+
+
+function cmCreateJobAvg() {
+	//ini_set('memory_limit','1G');
+	ini_set('max_execution_time',0);
+
+	db_set_active('bip');
+
+	$return = "";
+
+	db_drop_table('cm_job_average');
+
+	$header = array('cmja_job_name','cmja_node_id','cmja_dow','cmja_average','cmja_min','cmja_max');
+
+	$query = "create table cm_job_average as 
+			(SELECT cmjr_job_name cmja_job_name, 
+				cmjr_node_id cmja_node_id, 
+				DAYOFWEEK( cmjr_timestamp ) cmja_dow, 
+				AVG( cmjr_elapsed_time ) cmja_average, 
+				MIN( cmjr_elapsed_time ) cmja_min, 
+				MAX( cmjr_elapsed_time ) cmja_max
+			FROM cm_jobs_run
+			GROUP BY cmjr_job_name, cmjr_node_id, DAYOFWEEK( cmjr_timestamp ) )";
+	db_query($query);
+
+	db_add_primary_key('cm_job_average',array('cmja_job_name','cmja_node_id','cmja_dow'));
+
+	db_set_active();
+	return($return);
+}
+

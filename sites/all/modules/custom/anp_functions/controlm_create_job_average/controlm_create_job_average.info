@@ -1,0 +1,8 @@
+name = Control-M Create Job Averages
+description = This module contains functions to create a table containing the average run time of Control-M jobs
+core = 7.x
+package = "anp_functions"
+configure = admin/config/services/controlm_create_job_average
+dependencies[] = controlm_fetch_runtimes
+
+version = "7.x-X.X"

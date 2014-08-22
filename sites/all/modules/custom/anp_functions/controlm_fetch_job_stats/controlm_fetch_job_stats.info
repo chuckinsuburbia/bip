@@ -1,0 +1,9 @@
+name = Control-M Fetch Job Stats
+description = This module contains functions to fetch the job stats from Control-M
+core = 7.x
+package = "anp_functions"
+configure = admin/config/services/controlm_fetch_job_stats
+dependencies[] = controlm_wsdl_client
+dependencies[] = db_table_backup
+
+version = "7.x-X.X"

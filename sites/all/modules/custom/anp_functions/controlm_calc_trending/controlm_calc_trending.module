@@ -116,6 +116,15 @@ function cmCalcTrending() {
 	}
 	$rs_jobs = db_select('cm_jobs_run','cjr')->distinct()->fields('cjr',array('cmjr_job_name','cmjr_node_id'))->execute();
 	while($rec_job = $rs_jobs->fetchAssoc()) {
+
+		$update = FALSE;
+		if(!isset($trends[$rec_job['cmjr_job_name']][$rec_job['cmjr_node_id']])) {
+			$trends[$rec_job['cmjr_job_name']][$rec_job['cmjr_node_id']] = "";
+			$update = TRUE;
+			$alarm_txt = NULL;
+			$trend =0;
+		}
+
 		$rs_job_runtimes = db_select('cm_jobs_run','cjr')
 			->fields('cjr',array('cmjr_timestamp','cmjr_elapsed_time'))
 			->condition('cmjr_job_name',$rec_job['cmjr_job_name'],'=')
@@ -124,10 +133,46 @@ function cmCalcTrending() {
 			->range(0,$num_execs)
 			->execute();
 		while($rec_job_runtime = $rs_job_runtimes->fetchAssoc()) {
-			$jobs[$rec_job['cmjr_job_name']][$rec_job['cmjr_node_id']][] = array('timestamp' => $rec_job_runtime['cmjr_timestamp'],'runtime' =>$rec_job_runtime['cmjr_elapsed_time']);
+			$job[] = array('timestamp' => $rec_job_runtime['cmjr_timestamp'],'runtime' =>$rec_job_runtime['cmjr_elapsed_time']);
 		}
+		$lastrun = $job[0]['timestamp'];
+
+		if($lastrun != $trends[$rec_job['cmjr_job_name']][$rec_job['cmjr_node_id']]) {
+			foreach($job as $k => $v) {
+				$arrayX[] = $k;
+				$arrayY[] = $v['runtime'];
+			}
+			$trend = corrCoef($arrayX,$arrayY)*-1;
+			unset($arrayX); unset($arrayY);
+			if($trend > $threshold) {
+				$update = TRUE;
+				$alarm_txt = "TREND_UP";
+			} elseif($trend < -1*$threshold) {
+				$update = TRUE;
+				$alarm_txt = "TREND_DOWN";
+			} else {
+				$update = TRUE;
+				$alarm_txt = NULL;
+			}
+		}
+
+		if($update) {
+			$return .= "<p>".$rec_job['cmjr_job_name']." (".$rec_job['cmjr_node_id'].") = ".$trend." - ".$alarm_txt."</p>";
+			$keys = array(
+				'cmjt_job_name' => $rec_job['cmjr_job_name'],
+				'cmjt_node_id' => $rec_job['cmjr_node_id'],
+			);
+			$fields = array(
+				'cmjt_last_run' => $lastrun,
+				'cmjt_trend' => round($trend,4),
+				'cmjt_alarm' => $alarm_txt,
+			);
+			db_merge('cm_job_trend')->key($keys)->fields($fields)->execute();
+		}
+		unset($job);
 	}
 
+/*
 	foreach($jobs as $jobname => $nodes) {
 		foreach($nodes as $nodename => $jobruns) {
 			$update = FALSE;
@@ -176,6 +221,7 @@ function cmCalcTrending() {
 			}
 		}
 	}
+*/
 	//$return .= "<pre>".print_r($jobs,TRUE)."</pre>";
 	
 	db_set_active();
