@@ -1,0 +1,23 @@
+<?php
+
+function controlm_base_menu () {
+	$items['controlm'] = array(
+		'title' => 'Control-M',
+		'page callback' => 'controlm_description',
+		'access callback' => TRUE,
+		'expanded' => TRUE,
+	);
+	return $items;
+}
+function controlm_description() {
+  return array('#markup' => '<p>' . t('Place Holder') . '</p>');
+}
+
+function controlm_base_permission() {
+	return array(
+		'access controlm content' => array( 'title' => t('Access content for the Control-M module'), ),
+		'access controlm administration' => array( 'title' => t('Administer the Control-M Module'), ),
+		'access controlm data feeds' => array( 'title' => t('Access data feeds for the Control-M module'), ),
+	);
+}
+

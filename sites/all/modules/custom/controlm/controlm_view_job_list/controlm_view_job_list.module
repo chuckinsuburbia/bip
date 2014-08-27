@@ -5,7 +5,7 @@ function controlm_view_job_list_menu () {
 	$items['controlm/view_job_list'] = array(
 		'title' => 'View Job List',
 		'page callback' => 'controlm_view_job_list_execute',
-		'access arguments' => array('access content'),
+		'access arguments' => array('access controlm content'),
 		'type' => MENU_NORMAL_ITEM,
 	);
 	return $items;

@@ -1,8 +1,8 @@
 name = Control-M Fetch Extract
 description = This module contains functions to fetch the Control-M extract provided by a web service.
 core = 7.x
-package = "anp_functions"
-configure = admin/config/services/controlm_fetch_extract
+package = "control-m"
+configure = admin/config/services/controlm/fetch_extract
 dependencies[] = controlm_wsdl_client
 dependencies[] = db_table_backup
 

@@ -2,18 +2,18 @@
 
 function controlm_calc_trending_menu () {
 	$items = array();
-	$items['admin/config/services/controlm_calc_trending'] = array(
+	$items['admin/config/services/controlm/calc_trending'] = array(
 		'title' => 'Control-M Calculate Trending',
 		'description' => 'Configuration for Control-M Calculate Trending module',
 		'page callback' => 'drupal_get_form',
 		'page arguments' => array('controlm_calc_trending_form'),
-		'access arguments' => array('access administration pages'),
+		'access arguments' => array('access controlm administration'),
 		'type' => MENU_NORMAL_ITEM,
 	);
 	$items['controlm/calc_trending'] = array(
 		'title' => 'Calculate Trending',
 		'page callback' => 'controlm_calc_trending_execute',
-		'access arguments' => array('access administration pages'),
+		'access arguments' => array('access controlm data feeds'),
 		'type' => MENU_NORMAL_ITEM,
 	);
 	return $items;
@@ -102,74 +102,78 @@ function cmCalcTrending() {
 	$num_execs = variable_get('controlm_calc_trending_num_execs',10);
 	$threshold = variable_get('controlm_calc_trending_alarm_threshold','0.2');
 
-	$return = "";
+	$return = ""; $return2 = "";
 	$return .= "<p>Threshold: ".$threshold."<br />";
 	$return .= "Number of executions to count: ".$num_execs."</p>";
 
-	$rs_settings = db_select('cm_settings','cs')->fields('cs')->condition('cms_setting','TREND%','LIKE')->execute();
-	while($rec_settings = $rs_settings->fetchAssoc()) {
-		$settings[$rec_settings['CMS_SETTING']] = $rec_settings['CMS_VALUE'];
-	}
 	$rs_trends = db_select('cm_job_trend','cjt')->fields('cjt',array('cmjt_job_name','cmjt_node_id','cmjt_last_run'))->execute();
 	while($rec_trends = $rs_trends->fetchAssoc()) {
 		$trends[$rec_trends['cmjt_job_name']][$rec_trends['cmjt_node_id']] = $rec_trends['cmjt_last_run'];
 	}
-	$rs_jobs = db_select('cm_jobs_run','cjr')->distinct()->fields('cjr',array('cmjr_job_name','cmjr_node_id'))->execute();
-	while($rec_job = $rs_jobs->fetchAssoc()) {
 
-		$update = FALSE;
-		if(!isset($trends[$rec_job['cmjr_job_name']][$rec_job['cmjr_node_id']])) {
-			$trends[$rec_job['cmjr_job_name']][$rec_job['cmjr_node_id']] = "";
-			$update = TRUE;
-			$alarm_txt = NULL;
-			$trend =0;
+	$query = db_select('cm_jobs_run','cjr')->fields('cjr',array('cmjr_job_name','cmjr_node_id'));
+	$query->groupBy('cmjr_job_name')->groupBy('cmjr_node_id');
+	$query->addExpression('MAX(cmjr_timestamp)','lastrun');
+	$result = $query->execute();
+	while($record = $result->fetchAssoc()) {
+		if(!isset($trends[$record['cmjr_job_name']][$record['cmjr_node_id']]) ||
+			strtotime($trends[$record['cmjr_job_name']][$record['cmjr_node_id']]) < strtotime($record['lastrun'])) {
+			$jobs[$record['cmjr_job_name']][$record['cmjr_node_id']] = array('lastrun' => $record['lastrun']);
+		} else {
+			$return2 .= "<p>Job ".$record['cmjr_job_name'].", Node ".$record['cmjr_node_id']." does not need to have trending updated.<br />";
+			$return2 .= "Trend time: ".$trends[$record['cmjr_job_name']][$record['cmjr_node_id']]."<br />";
+			$return2 .= "Last Run: ".$record['lastrun']."</p>";
 		}
+	}
 
-		$rs_job_runtimes = db_select('cm_jobs_run','cjr')
-			->fields('cjr',array('cmjr_timestamp','cmjr_elapsed_time'))
-			->condition('cmjr_job_name',$rec_job['cmjr_job_name'],'=')
-			->condition('cmjr_node_id',$rec_job['cmjr_node_id'],'=')
-			->orderBy('cmjr_timestamp','DESC')
-			->range(0,$num_execs)
-			->execute();
-		while($rec_job_runtime = $rs_job_runtimes->fetchAssoc()) {
-			$job[] = array('timestamp' => $rec_job_runtime['cmjr_timestamp'],'runtime' =>$rec_job_runtime['cmjr_elapsed_time']);
-		}
-		$lastrun = $job[0]['timestamp'];
+	if(isset($jobs)) {
+		foreach($jobs as $job => $nodes) {
+			foreach($nodes as $node => $runs) {
+				$return .= "Job ".$job.", Node ".$node." needs to have trending updated.<br />";
 
-		if($lastrun != $trends[$rec_job['cmjr_job_name']][$rec_job['cmjr_node_id']]) {
-			foreach($job as $k => $v) {
-				$arrayX[] = $k;
-				$arrayY[] = $v['runtime'];
-			}
-			$trend = corrCoef($arrayX,$arrayY)*-1;
-			unset($arrayX); unset($arrayY);
-			if($trend > $threshold) {
-				$update = TRUE;
-				$alarm_txt = "TREND_UP";
-			} elseif($trend < -1*$threshold) {
-				$update = TRUE;
-				$alarm_txt = "TREND_DOWN";
-			} else {
-				$update = TRUE;
+				$lastrun = $runs['lastrun'];
+				unset($runs['lastrun']);
+
+				$query = db_select('cm_jobs_run','cjr')
+					->fields('cjr',array('cmjr_elapsed_time'))
+					->condition('cmjr_job_name',$job,'=')
+					->condition('cmjr_node_id',$node,'=')
+					->orderBy('cmjr_timestamp','DESC')
+					->range(0,$num_execs);
+				$result = $query->execute();
+				while($record = $result->fetchAssoc()) {
+					$runs[] = $record['cmjr_elapsed_time'];
+				}
+				foreach($runs as $k => $v) {
+					$arrayX[] = $k;
+					$arrayY[] = $v;
+				}
+				$trend = corrCoef($arrayX,$arrayY)*-1;
+				unset($arrayX); unset($arrayY);
+
 				$alarm_txt = NULL;
+				if($trend > $threshold) {
+					$alarm_txt = "TREND_UP";
+				} elseif($trend < -1*$threshold) {
+					$alarm_txt = "TREND_DOWN";
+				} else {
+					$alarm_txt = NULL;
+				}
+	
+				$return .= "<p>".$job." (".$node.") = ".$trend." - ".$alarm_txt."</p>";
+				$keys = array(
+					'cmjt_job_name' => $job,
+					'cmjt_node_id' => $node,
+				);
+				$fields = array(
+					'cmjt_last_run' => $lastrun,
+					'cmjt_last_time' => $runs[0],
+					'cmjt_trend' => round($trend,4),
+					'cmjt_alarm' => $alarm_txt,
+				);
+				db_merge('cm_job_trend')->key($keys)->fields($fields)->execute();
 			}
 		}
-
-		if($update) {
-			$return .= "<p>".$rec_job['cmjr_job_name']." (".$rec_job['cmjr_node_id'].") = ".$trend." - ".$alarm_txt."</p>";
-			$keys = array(
-				'cmjt_job_name' => $rec_job['cmjr_job_name'],
-				'cmjt_node_id' => $rec_job['cmjr_node_id'],
-			);
-			$fields = array(
-				'cmjt_last_run' => $lastrun,
-				'cmjt_trend' => round($trend,4),
-				'cmjt_alarm' => $alarm_txt,
-			);
-			db_merge('cm_job_trend')->key($keys)->fields($fields)->execute();
-		}
-		unset($job);
 	}
 
 /*
@@ -225,6 +229,6 @@ function cmCalcTrending() {
 	//$return .= "<pre>".print_r($jobs,TRUE)."</pre>";
 	
 	db_set_active();
-	return($return);
+	return($return.$return2);
 }
 

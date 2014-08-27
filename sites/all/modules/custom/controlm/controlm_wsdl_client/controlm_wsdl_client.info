@@ -1,7 +1,7 @@
 name = Control-M WSDL Client
 description = This module contains functions to configure the Control-M Web Service
 core = 7.x
-package = "anp_functions"
+package = "control-m"
 configure = admin/config/services/controlm_wsdl_client
 dependencies[] = nusoap_include
 

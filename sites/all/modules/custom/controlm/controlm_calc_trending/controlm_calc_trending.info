@@ -1,8 +1,8 @@
 name = Control-M Calculate Trending
 description = This module calculates trends in the execution times of Control-M jobs
 core = 7.x
-package = "anp_functions"
-configure = admin/config/services/controlm_calc_trending
+package = "control-m"
+configure = admin/config/services/controlm/calc_trending
 dependencies[] = controlm_fetch_runtimes
 dependencies[] = useful_functions
 

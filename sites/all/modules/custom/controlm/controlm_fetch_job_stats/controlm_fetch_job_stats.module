@@ -2,18 +2,18 @@
 
 function controlm_fetch_job_stats_menu () {
 	$items = array();
-	$items['admin/config/services/controlm_fetch_job_stats'] = array(
+	$items['admin/config/services/controlm/fetch_job_stats'] = array(
 		'title' => 'Control-M Fetch Job Stats',
 		'description' => 'Configuration for Control-M Fetch Job Stats module',
 		'page callback' => 'drupal_get_form',
 		'page arguments' => array('controlm_fetch_job_stats_form'),
-		'access arguments' => array('access administration pages'),
+		'access arguments' => array('access controlm administration'),
 		'type' => MENU_NORMAL_ITEM,
 	);
 	$items['controlm/fetch_job_stats'] = array(
 		'title' => 'Fetch Job Stats',
 		'page callback' => 'controlm_fetch_job_stats_execute',
-		'access arguments' => array('access administration pages'),
+		'access arguments' => array('access controlm data feeds'),
 		'type' => MENU_NORMAL_ITEM,
 	);
 	return $items;
@@ -80,7 +80,7 @@ function cmGetJobStats() {
 	}
 	$proxy = $client->getProxy();
 
-	$result = $proxy->getJobStats('140819');
+	$result = $proxy->getJobStats($odate);
 	if ($client->fault) {
 		$return = "Client fault";
 	} else {
@@ -88,7 +88,7 @@ function cmGetJobStats() {
 		if ($err) {
 			$return = "Client error: ".$err;
 		} else {
-			//$return .= "<pre>".print_r($result,TRUE)."</pre>";
+			$return .= "<pre>".print_r($result,TRUE)."</pre>";
 			$return .= "Backing up table cm_job_status...";
 			dbTblBackup('cm_job_status');
 			$return .= "Done<br />Truncating table cm_job_status...";

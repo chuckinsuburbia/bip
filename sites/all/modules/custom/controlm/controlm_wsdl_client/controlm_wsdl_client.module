@@ -7,19 +7,10 @@ function controlm_wsdl_client_menu () {
 		'description' => 'Configuration for Control-M Web Service',
 		'page callback' => 'drupal_get_form',
 		'page arguments' => array('controlm_wsdl_client_form'),
-		'access arguments' => array('access administration pages'),
+		'access arguments' => array('access controlm administration'),
 		'type' => MENU_NORMAL_ITEM,
 	);
-	$items['controlm'] = array(
-		'title' => 'Control-M',
-		'page callback' => 'controlm_description',
-		'access callback' => TRUE,
-		'expanded' => TRUE,
-	);
 	return $items;
-}
-function controlm_description() {
-  return array('#markup' => '<p>' . t('Place Holder') . '</p>');
 }
 function controlm_wsdl_client_form ($form, &$form_state) {
 	$form['controlm_wsdl_client_url'] = array(
