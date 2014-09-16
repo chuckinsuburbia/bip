@@ -1,0 +1,8 @@
+name = Control-M Purge DB
+description = This module contains functions to purge database tables of unneeded entries
+core = 7.x
+package = "control-m"
+configure = admin/config/services/controlm/purge_db
+dependencies[] = controlm_base
+
+version = "7.x-X.X"

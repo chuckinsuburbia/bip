@@ -88,7 +88,7 @@ function cmGetJobStats() {
 		if ($err) {
 			$return = "Client error: ".$err;
 		} else {
-			$return .= "<pre>".print_r($result,TRUE)."</pre>";
+			//$return .= "<pre>".print_r($result,TRUE)."</pre>";
 			$return .= "Backing up table cm_job_status...";
 			dbTblBackup('cm_job_status');
 			$return .= "Done<br />Truncating table cm_job_status...";

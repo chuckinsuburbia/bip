@@ -1,0 +1,91 @@
+<?php
+
+function service_manager_permission() {
+	return array(
+		'access service_manager content' => array( 'title' => t('Access content for the Service Manager module'), ),
+		'access service_manager administration' => array( 'title' => t('Administer the Service Manager Module'), ),
+		'access service_manager data feeds' => array( 'title' => t('Access data feeds for the Service Manager module'), ),
+	);
+}
+
+function service_manager_menu () {
+	$items['admin/config/services/service_manager'] = array(
+		'title' => 'Service Manager',
+		'description' => 'Configuration for Service Manager',
+		'page callback' => 'drupal_get_form',
+		'page arguments' => array('service_manager_config_form'),
+		'access arguments' => array('access service_manager administration'),
+		'type' => MENU_NORMAL_ITEM,
+	);
+	$items['service_manager'] = array(
+		'title' => 'Service Manager',
+		'page callback' => 'service_manager_description',
+		'access callback' => TRUE,
+		'expanded' => TRUE,
+	);
+	$items['service_manager/get_location_list'] = array(
+		'title' => 'Get Location List',
+		'page callback' => 'service_manager_get_location_list',
+		'access arguments' => array('access service_manager content'),
+		'type' => MENU_NORMAL_ITEM,
+	);
+	return $items;
+}
+
+function service_manager_config_form ($form, &$form_state) {
+        $form['service_manager_config_wsdl_client_url'] = array(
+                '#type' => 'textfield',
+                '#title' => t('Configuration Management URL'),
+                '#default_value' => variable_get('service_manager_config_wsdl_client_url', ''),
+                '#size' => 255,
+                '#maxlength' => 255,
+                '#description' => t('The URL to the Service Manager Web Service for Configuration Management.'),
+                '#required' => TRUE,
+        );
+        $form['service_manager_incident_wsdl_client_url'] = array(
+                '#type' => 'textfield',
+                '#title' => t('Incident Management URL'),
+                '#default_value' => variable_get('service_manager_incident_wsdl_client_url', ''),
+                '#size' => 255,
+                '#maxlength' => 255,
+                '#description' => t('The URL to the Service Manager Web Service for Incident Management.'),
+                '#required' => TRUE,
+        );
+        return system_settings_form($form);
+}
+
+function service_manager_description() {
+	return array('#markup' => '<p>' . t('Place Holder') . '</p>');
+}
+
+function service_manager_get_location_list() {
+	$return = "";
+	$sc = variable_get('service_manager_config_wsdl_client_url', '');
+
+        $client = new nusoap_client($sc, 'wsdl', false, false, false, false, 0, 600);
+        $err = $client->getError();
+        if ($err) {
+                return('<h2>Constructor error</h2><pre>' . $err . '</pre>');
+        }
+        $client->setCredentials('pem', 'Pemspassword');
+
+        $query = 'SiteCategory="STORE"&closed="false"';
+        $keys = new soapval('keys','ConfigurationKeysType',"","http://servicecenter.peregrine.com/PWS",false,array("query" => $query));
+        $instance = new soapval("instance","ConfigurationInstanceType","","http://servicecenter.peregrine.com/PWS");
+        $model = new soapval("model", "ConfigurationModelType",array($keys,$instance),null,"http://servicecenter.peregrine.com/PWS");
+        $RetrieveLocationListRequest = new soapval("RetrieveLocationListRequest","RetrieveLocationListRequestType",$model,"http://servicecenter.peregrine.com/PWS");
+        $result = $client->call('RetrieveLocationList',$RetrieveLocationListRequest->serialize('literal'),"http://servicecenter.peregrine.com/PWS");
+
+        if ($client->fault) {
+                return("Client fault");
+        } else {
+                $err = $client->getError();
+                if ($err) {
+                        return("Client error: ".$err);
+                } else {
+                        $return .= "<pre>".print_r($result['instance'],TRUE)."</pre>";
+                }
+        }
+	return(array('#markup' => t($return)));
+}
+

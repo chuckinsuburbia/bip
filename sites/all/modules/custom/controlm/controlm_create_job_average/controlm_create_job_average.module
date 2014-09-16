@@ -70,23 +70,35 @@ function cmCreateJobAvg() {
 
 	$return = "";
 
-	db_drop_table('cm_job_average');
+	$tbl = "cm_job_average";
+	$return .= "Backing up DB table ".$tbl."...";
+	dbTblBackup($tbl);
+	$return .= "Done<br />";
 
-	$header = array('cmja_job_name','cmja_node_id','cmja_dow','cmja_average','cmja_min','cmja_max');
+	$return .= "<br />Emptying DB table ".$tbl."...";
+	dbTblEmpty($tbl);
+	$return .= "Done<br />";
 
-	$query = "create table cm_job_average as 
-			(SELECT cmjr_job_name cmja_job_name, 
-				cmjr_node_id cmja_node_id, 
-				DAYOFWEEK( cmjr_timestamp ) cmja_dow, 
-				AVG( cmjr_elapsed_time ) cmja_average, 
-				MIN( cmjr_elapsed_time ) cmja_min, 
-				MAX( cmjr_elapsed_time ) cmja_max
-			FROM cm_jobs_run
-			GROUP BY cmjr_job_name, cmjr_node_id, DAYOFWEEK( cmjr_timestamp ) )";
-	db_query($query);
-
-	db_add_primary_key('cm_job_average',array('cmja_job_name','cmja_node_id','cmja_dow'));
-
+	$return .= "<br />Collecting Data on jobs run...";
+	$query = db_select('cm_jobs_run','cjr');
+	$query->addField('cjr','cmjr_job_name','cmja_job_name');
+	$query->addField('cjr','cmjr_node_id','cmja_node_id');
+	$query->groupBy('cmjr_job_name')->groupBy('cmjr_node_id')->groupBy('DAYOFWEEK(cmjr_timestamp)');
+	$query->addExpression('DAYOFWEEK(cmjr_timestamp)','cmja_dow');
+	$query->addExpression('AVG(cmjr_elapsed_time)','cmja_average');
+	$query->addExpression('MIN(cmjr_elapsed_time)','cmja_min');
+	$query->addExpression('MAX(cmjr_elapsed_time)','cmja_max');
+	$result = $query->execute();
+	$return .= "Done<br />";
+	
+	$return .= "<br />Inserting data into Averages table...";
+	while($record = $result->fetchAssoc()) {
+//		$return .= "<pre>".print_r($record,TRUE)."</pre>";
+		$insert = db_insert($tbl)->fields($record)->execute();
+		usleep(100); //Sleep for 100 microseconds so other queries don't get jammed up
+	}
+	$return .= "Done<br />";
+	
 	db_set_active();
 	return($return);
 }

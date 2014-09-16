@@ -1,0 +1,108 @@
+<?php
+
+function controlm_purge_db_menu () {
+	$items = array();
+	$items['admin/config/services/controlm/purge_db'] = array(
+		'title' => 'Control-M Purge DB Entries',
+		'description' => 'Configuration for Control-M Purge DB module',
+		'page callback' => 'drupal_get_form',
+		'page arguments' => array('controlm_purge_db_form'),
+		'access arguments' => array('access controlm administration'),
+		'type' => MENU_NORMAL_ITEM,
+	);
+	$items['controlm/purge_db'] = array(
+		'title' => 'Purge DB Entries',
+		'page callback' => 'controlm_purge_db_execute',
+		'access arguments' => array('access controlm data feeds'),
+		'type' => MENU_NORMAL_ITEM,
+	);
+	return $items;
+}
+function controlm_purge_db_execute() {
+  return array('#markup' => '<p>' . t(cmPurgeDB()) . '</p>');
+}
+function controlm_purge_db_form ($form, &$form_state) {
+	$form['controlm_purge_db_cron'] = array(
+		'#type' => 'checkbox',
+		'#title' => t('Run during Cron?'),
+		'#default_value' => variable_get('controlm_purge_db_cron',1),
+		'#description' => t('Do we want to run the fetch periodically through cron?'),
+		'#required' => FALSE,
+	);
+	$form['controlm_purge_db_interval'] = array(
+		'#type' => 'textfield',
+		'#title' => t('Cron Interval'),
+		'#default_value' => variable_get('controlm_purge_db_interval',3600),
+		'#size' => 10,
+		'#maxlength' => 10,
+		'#description' => t('The number of seconds between Cron executions.'),
+		'#required' => TRUE,
+	);
+	$form['controlm_purge_db_hist_span'] = array(
+		'#type' => 'textfield',
+		'#title' => t('Amount Of History To Keep'),
+		'#default_value' => variable_get('controlm_purge_db_hist_span','2 YEAR'),
+		'#size' => 50,
+		'#maxlength' => 50,
+		'#description' => t('The amount of history to keep in BIP tables.  Must be a valid time interval for the DB engine.'),
+		'#required' => TRUE,
+	);
+	return system_settings_form($form);
+}
+function controlm_purge_db_form_validate ($form, &$form_state) {
+	if(!ctype_digit(strval($form_state['values']['controlm_purge_db_interval']))) {
+		form_set_error('controlm_purge_db_interval', t('Interval value must be an integer.'));
+	}
+	if($form_state['values']['controlm_purge_db_interval'] <= 0) {
+		form_set_error('controlm_purge_db_interval', t('Interval value must be greater than zero.'));
+	}
+	$sql = "SELECT DATE_SUB(NOW(), INTERVAL ".$form_state['values']['controlm_purge_db_hist_span'].") as dt";
+	$result = db_query($sql);
+	$date = $result->fetchField();
+	$d = DateTime::createFromFormat('Y-m-d h:i:s', $date);
+	if($d->format('Y-m-d h:i:s') != $date) {
+		form_set_error('controlm_purge_db_hist_span',t('History span must be a valid date/time interval in DB engine.'));
+	}
+}
+function controlm_purge_db_cron() {
+	$enabled = variable_get('controlm_purge_db_cron',0);
+	if($enabled = 1) {
+		$interval = variable_get('controlm_purge_db_interval',3600);
+		if (time() >= variable_get('controlm_purge_db_next_execution', 0)) {
+			drupal_set_time_limit(0);
+			$res = cmPurgeDB();
+			watchdog('controlm_purge_db', 'controlm_purge_db_cron ran');
+			variable_set('controlm_purge_db_next_execution', time() + $interval);
+		}
+	}
+}
+
+
+function cmPurgeDB() {
+	ini_set('memory_limit','1G');
+	ini_set('max_execution_time',0);
+
+	db_set_active('bip');
+
+	$return = "";
+
+	$hist_span = variable_get('controlm_purge_db_hist_span','2 YEAR');
+
+	//$query = db_delete('cm_jobs_run')->condition('cmjr_timestamp','DATE_SUB(NOW(), INTERVAL '.$hist_span.')','<')->execute();
+	$query = db_select('cm_jobs_run','cjr')->fields('cjr',array('cmjr_id'))->condition('cmjr_timestamp',"DATE_SUB(NOW(), INTERVAL ".$hist_span.")",'<');
+
+//	$num_rows = $query->countQuery()->execute()->fetchField();
+//	$return .= "<p>Number of rows affected: ".$num_rows."</p>";
+
+	$result = $query->execute();
+	while($record = $result->fetchAssoc()) {
+		$return .= "Deleting cmjr_id=".$record['cmjr_id']."...";
+		db_delete('cm_jobs_run')->condition('cmjr_id',$record['cmjr_id'],'=')->execute();
+		$return .= "Done.<br />";
+		usleep(100); //sleep for 100 microseconds so other DB queries don't get jammed up
+	}
+
+	db_set_active();
+	return($return);
+}
+

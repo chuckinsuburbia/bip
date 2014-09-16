@@ -1,0 +1,252 @@
+<?php
+function store_network_down_permission() {
+	return array(
+		'view store_network_down' => array( 'title' => t('Access content for the Store Network Down module'), ),
+		'administer store_network_down' => array( 'title' => t('Administer the Store Network Down module'), ),
+	);
+}
+
+function store_network_down_menu () {
+	$items = array();
+	$items['store_network_down'] = array(
+		'title' => 'Store Network Down',
+		'page callback' => 'store_network_down_execute',
+		'access arguments' => array('view store_network_down'),
+		'type' => MENU_NORMAL_ITEM,
+	);
+	$items['admin/config/services/anp_functions/store_network_down'] = array(
+		'title' => 'Store Network Down',
+		'description' => 'Configuration for Store Network Down module',
+		'page callback' => 'drupal_get_form',
+		'page arguments' => array('store_network_down_form'),
+		'access arguments' => array('administer store_network_down'),
+		'type' => MENU_NORMAL_ITEM,
+        );
+	return $items;
+}
+
+function store_network_down_form($form, &$form_state) {
+	$links = variable_get('store_network_down_links',array());
+
+	$form_state['storage']['store_network_down_links'] = isset($form_state['storage']['store_network_down_links']) ? $form_state['storage']['store_network_down_links'] : sizeof($links);
+
+	$form['store_network_down_links'] = array(
+		'#type' => 'container',
+		'#tree' => TRUE,
+		'#prefix' => '<div id="store_network_down_links">',
+		'#suffix' => '</div>',
+	);
+
+	if ($form_state['storage']['store_network_down_links']) {
+		for ($i = 1; $i <= $form_state['storage']['store_network_down_links']; $i++) {
+			$form['store_network_down_links'][$i] = array(
+				'#type' => 'fieldset',
+				'#title' => t('Link '.$i),
+				'#tree' => TRUE,
+			);
+			$form['store_network_down_links'][$i]['description'] = array(
+				'#title' => t('Description'),
+				'#type' => 'textfield',
+				'#default_value' => $links[$i]['description'],
+			);
+			$form['store_network_down_links'][$i]['url'] = array(
+				'#title' => t('URL'),
+				'#type' => 'textfield',
+				'#default_value' => $links[$i]['url'],
+			);
+		}
+	}
+
+	$form['add_link'] = array(
+		'#type' => 'submit',
+		'#value' => t('Add A Link'),
+		'#submit' => array('store_network_down_ajax_add_link'),
+		'#href' => '',
+		'#ajax' => array(
+			'callback' => 'store_network_down_ajax_callback',
+			'wrapper' => 'store_network_down_links',
+		),
+	);
+	if ($form_state['storage']['store_network_down_links'] > 0) {
+		$form['remove_link'] = array(
+			'#type' => 'submit',
+			'#value' => t('Remove A Link'),
+			'#submit' => array('store_network_down_ajax_remove_link'),
+			'#ajax' => array(
+				'callback' => 'store_network_down_ajax_callback',
+				'wrapper' => 'store_network_down_links',
+			),
+		);
+	}
+
+	return system_settings_form($form);
+}
+function store_network_down_ajax_callback($form, $form_state) {
+	return $form['store_network_down_links'];
+}
+function store_network_down_ajax_add_link($form, &$form_state) {
+	$form_state['storage']['store_network_down_links']++;
+	$form_state['rebuild'] = TRUE;
+}
+function store_network_down_ajax_remove_link($form, &$form_state) {
+	if($form_state['storage']['store_network_down_links'] > 0) {
+		$form_state['storage']['store_network_down_links']--;
+	}
+	$form_state['rebuild'] = TRUE;
+}
+
+
+function store_network_down_execute() {
+	$markup = array(
+		'content' => array(),
+	);
+
+	//Links
+	$links = variable_get('store_network_down_links',array());
+	$linkhtml = "";
+	foreach($links as $link) {
+		$linkhtml .= "<a href='".$link['url']."'>".$link['description']."</a>&nbsp;&nbsp;";
+	}
+	$markup['content'][] = array('#prefix' => '<p>','#markup' => t($linkhtml),'#suffix' => '</p>');
+
+	db_set_active('nagios');
+
+	//LightPath Links
+	$query = db_select('service','s');
+	$query->groupBy('host_name');
+	$query->addField('s','host_name','host_name');
+	$query->addExpression("IF(sum( current_state ) >0, 'red', '#33FF00' )",'state');
+	$query->condition('host_name','MON_HQ_INT%','LIKE');
+	$query->condition(db_or()->condition('service_description','%ing%','LIKE')->condition('service_description','%Status','LIKE'));
+	$result = $query->execute();
+
+	$html = "";
+	while($record = $result->fetchAssoc()) {
+		$html .= "<a style='background-color: ".$record['state']."' href='https://nagios/nagios-ro/cgi-bin/status.cgi?host=".$record['host_name']."' target='_blank'>";
+		$html .= $record['host_name']."</a>&nbsp;&nbsp;";
+	}
+	$markup['content'][] = array('#prefix' => '<p>','#markup' => t($html),'#suffix' => '</p>');
+
+	//Host Down
+	$query = db_select('host','hs');
+	$query->leftJoin('HostInfo','hi','hi.host_name = hs.host_name');
+	$query->leftJoin('ServiceName','sn1','hi.PrimaryDescription = sn1.ServiceDescription');
+	$query->leftJoin('ServiceName','sn2','hi.SecondaryDescription = sn2.ServiceDescription');
+	$query->leftJoin('sites','s','s.s_division = substr(hs.host_name, 1,2) and s.s_store = substr(hs.host_name,3,3)');
+	$query->leftJoin('StoreInfo','si','CAST(si.store AS CHAR) = hs.host_name');
+	$query->leftJoin('sc_store_data','sc','hs.host_name = sc.location');
+	$query->addField('hs','host_name','Store');
+	$query->addField('si','city','City');
+	$query->addField('si','siteid','SiteID');
+	$query->addField('sn1','ServiceName','Pri');
+	$query->addField('sn2','ServiceName','Backup');
+	$query->addExpression('timediff(now(), from_unixtime(hs.last_state_change))','Duration');
+	$query->addField('si','pharmacy','Rx');
+	$query->addField('si','mwg','MWG');
+	$query->addExpression("if( sc.anp_failover = 'NULL', '', sc.anp_failover )",'Failover');
+	$query->distinct();
+	$query->condition('hs.current_state','0','>');
+	$query->condition('hs.host_name','^[0-9]{5}.*','RLIKE');
+	$query->orderBy('hs.host_name');
+	$result = $query->execute();
+
+	while($record = $result->fetchAssoc()) {
+		//$markup .= "<pre>".print_r($record,TRUE)."</pre>";
+		$hostdown['#header'] = array_keys($record);
+		$hostdown['#rows'][] = array_values($record);
+	}
+	if(isset($hostdown)) {
+		$hostdown['#theme'] = 'table';
+		$hostdown['#attributes'] = array('class' => array('table-class'));
+		$hostdown['#prefix'] = "<h2>Store Communication Completely Down</h2><p>";
+		$hostdown['#suffix'] = "</p>";
+		$markup['content'][] = $hostdown;
+	}
+
+	//Primary Down
+	$query = db_select('service','ss');
+	$query->leftJoin('host','hs','hs.host_name = ss.host_name');
+	$query->leftJoin('HostInfo','hi','hi.host_name = ss.host_name and hi.PrimaryDescription = ss.service_description');
+	$query->leftJoin('ServiceName','sn1','ss.service_description = sn1.ServiceDescription');
+	$query->leftJoin('ServiceName','sn2','hi.SecondaryDescription = sn2.ServiceDescription');
+	$query->leftJoin('sites','s','s.s_division = substr(ss.host_name, 1,2) and s.s_store = substr(ss.host_name,3,3)');
+	$query->leftJoin('StoreInfo','si','CAST(si.store AS CHAR) = ss.host_name');
+	$query->leftJoin('sc_store_data','sc','hs.host_name = sc.location');
+	$query->addExpression("concat('<a href=\"https://nagios/nagios-ro/cgi-bin/status.cgi?host=',ss.host_name,'\" target=\"_new\">',ss.host_name,'</a>')",'Store');
+	$query->addField('si','city','City');
+	$query->addField('si','siteid','SiteID');
+	$query->addField('sn1','ServiceName','Pri');
+	$query->addField('sn2','ServiceName','Backup');
+	$query->addExpression('timediff(now(), from_unixtime(ss.last_state_change))','Duration');
+	$query->addField('si','pharmacy','Rx');
+	$query->addField('si','mwg','MWG');
+	$query->addexpression("if( sc.anp_failover = 'NULL', '', sc.anp_failover )",'Failover');
+	//$query->addField('ss','service_description','Description');
+	$query->distinct();
+	$query->condition('ss.current_state','2','=');
+	$query->condition('hs.host_name','^[0-9]{5}.*','RLIKE');
+	$query->condition('hs.current_state','0','=');
+	$query->isNotNull('hi.PrimaryDescription');
+	$query->condition('ss.service_description','Site_Ping','!=');
+	$query->orderBy('ss.host_name');
+	$result = $query->execute();
+
+	while($record = $result->fetchAssoc()) {
+		//$markup .= "<pre>".print_r($record,TRUE)."</pre>";
+		$pridown['#header'] = array_keys($record);
+		$pridown['#rows'][] = array_values($record);
+	}
+	if(isset($pridown)) {
+		$pridown['#theme'] = 'table';
+		$pridown['#attributes'] = array('class' => array('table-class'));
+		$pridown['#prefix'] = "<h2>XO Data/Voice Circuit Down</h2><p>";
+		$pridown['#suffix'] = "</p>";
+		$markup['content'][] = $pridown;
+	}
+
+	//Backup Down
+	$query = db_select('service','ss');
+	$query->leftJoin('host','hs','hs.host_name = ss.host_name');
+	$query->leftJoin('HostInfo','hi','hi.host_name = ss.host_name and hi.SecondaryDescription = ss.service_description');
+	$query->leftJoin('ServiceName','sn1','ss.service_description = sn1.ServiceDescription');
+	$query->leftJoin('ServiceName','sn2','hi.PrimaryDescription = sn2.ServiceDescription');
+	$query->leftJoin('sites','s','s.s_division = substr(ss.host_name, 1,2) and s.s_store = substr(ss.host_name,3,3)');
+	$query->leftJoin('StoreInfo','si','CAST(si.store AS CHAR) = ss.host_name');
+	$query->leftJoin('sc_store_data','sc','hs.host_name = sc.location');
+	$query->addExpression("concat('<a href=\"https://nagios/nagios-ro/cgi-bin/status.cgi?host=',ss.host_name,'\" target=\"_new\">',ss.host_name,'</a>')",'Store');
+	$query->addField('si','city','City');
+	$query->addField('si','siteid','SiteID');
+	$query->addField('sn1','ServiceName','Backup');
+	$query->addField('sn2','ServiceName','Pri');
+	$query->addExpression('timediff(now(), from_unixtime(ss.last_state_change))','Duration');
+	$query->addField('si','pharmacy','Rx');
+	$query->addField('si','mwg','MWG');
+	$query->addexpression("if( sc.anp_failover = 'NULL', '', sc.anp_failover )",'Failover');
+	//$query->addField('ss','service_description','Description');
+	$query->distinct();
+	$query->condition('ss.current_state','2','=');
+	$query->condition('hs.host_name','^[0-9]{5}.*','RLIKE');
+	$query->condition('hs.current_state','0','=');
+	$query->isNotNull('hi.PrimaryDescription');
+	$query->condition('ss.service_description','Site_Ping','!=');
+	$query->orderBy('ss.host_name');
+	$result = $query->execute();
+
+	while($record = $result->fetchAssoc()) {
+		$secdown['#header'] = array_keys($record);
+		$secdown['#rows'][] = array_values($record);
+	}
+	if(isset($secdown)) {
+		$secdown['#theme'] = 'table';
+		$secdown['#attributes'] = array('class' => array('table-class'));
+		$secdown['#prefix'] = "<h2>Alternate Data Circuit or Backup Down</h2><p>";
+		$secdown['#suffix'] = "</p>";
+		$markup['content'][] = $secdown;
+	}
+	
+
+	db_set_active();
+
+	return($markup);
+}
+

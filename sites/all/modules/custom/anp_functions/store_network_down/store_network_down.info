@@ -1,0 +1,8 @@
+name = Store Network Down
+description = This module contains code to display stores with network issues
+core = 7.x
+package = "anp_functions"
+configure = admin/config/services/anp_functions/store_network_down
+dependencies[] = service_manager
+
+version = "7.x-X.X"
