@@ -3,12 +3,13 @@
 function controlm_purge_db_menu () {
 	$items = array();
 	$items['admin/config/services/controlm/purge_db'] = array(
-		'title' => 'Control-M Purge DB Entries',
+		'title' => 'Purge DB',
 		'description' => 'Configuration for Control-M Purge DB module',
 		'page callback' => 'drupal_get_form',
 		'page arguments' => array('controlm_purge_db_form'),
 		'access arguments' => array('access controlm administration'),
-		'type' => MENU_NORMAL_ITEM,
+		'type' => MENU_LOCAL_TASK,
+		'weight' => 8,
 	);
 	$items['controlm/purge_db'] = array(
 		'title' => 'Purge DB Entries',
@@ -59,8 +60,8 @@ function controlm_purge_db_form_validate ($form, &$form_state) {
 	$sql = "SELECT DATE_SUB(NOW(), INTERVAL ".$form_state['values']['controlm_purge_db_hist_span'].") as dt";
 	$result = db_query($sql);
 	$date = $result->fetchField();
-	$d = DateTime::createFromFormat('Y-m-d h:i:s', $date);
-	if($d->format('Y-m-d h:i:s') != $date) {
+	$d = DateTime::createFromFormat('Y-m-d H:i:s', $date);
+	if($d->format('Y-m-d H:i:s') != $date) {
 		form_set_error('controlm_purge_db_hist_span',t('History span must be a valid date/time interval in DB engine.'));
 	}
 }
@@ -89,7 +90,9 @@ function cmPurgeDB() {
 	$hist_span = variable_get('controlm_purge_db_hist_span','2 YEAR');
 
 	//$query = db_delete('cm_jobs_run')->condition('cmjr_timestamp','DATE_SUB(NOW(), INTERVAL '.$hist_span.')','<')->execute();
-	$query = db_select('cm_jobs_run','cjr')->fields('cjr',array('cmjr_id'))->condition('cmjr_timestamp',"DATE_SUB(NOW(), INTERVAL ".$hist_span.")",'<');
+	$query = db_select('cm_jobs_run','cjr')
+		->fields('cjr',array('cmjr_id'))
+		->where('cmjr_timestamp < DATE_SUB(NOW(), INTERVAL '.$hist_span.')');
 
 //	$num_rows = $query->countQuery()->execute()->fetchField();
 //	$return .= "<p>Number of rows affected: ".$num_rows."</p>";
@@ -97,6 +100,7 @@ function cmPurgeDB() {
 	$result = $query->execute();
 	while($record = $result->fetchAssoc()) {
 		$return .= "Deleting cmjr_id=".$record['cmjr_id']."...";
+		$return .= "<pre>".print_r($record,TRUE)."</pre>";
 		db_delete('cm_jobs_run')->condition('cmjr_id',$record['cmjr_id'],'=')->execute();
 		$return .= "Done.<br />";
 		usleep(100); //sleep for 100 microseconds so other DB queries don't get jammed up

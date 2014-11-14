@@ -1,0 +1,9 @@
+name = Oracle Calculate Trending
+description = This module calculates trends in the size of Oracle segments
+core = 7.x
+package = "oracle"
+configure = admin/config/services/oracle/calc_trending
+dependencies[] = oracle_fetch_size
+dependencies[] = useful_functions
+
+version = "7.x-X.X"

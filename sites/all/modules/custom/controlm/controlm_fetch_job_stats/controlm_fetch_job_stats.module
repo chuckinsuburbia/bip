@@ -3,12 +3,13 @@
 function controlm_fetch_job_stats_menu () {
 	$items = array();
 	$items['admin/config/services/controlm/fetch_job_stats'] = array(
-		'title' => 'Control-M Fetch Job Stats',
+		'title' => 'Fetch Job Stats',
 		'description' => 'Configuration for Control-M Fetch Job Stats module',
 		'page callback' => 'drupal_get_form',
 		'page arguments' => array('controlm_fetch_job_stats_form'),
 		'access arguments' => array('access controlm administration'),
-		'type' => MENU_NORMAL_ITEM,
+		'type' => MENU_LOCAL_TASK,
+		'weight' => 4,
 	);
 	$items['controlm/fetch_job_stats'] = array(
 		'title' => 'Fetch Job Stats',

@@ -1,0 +1,183 @@
+<?php
+
+function controlm_gantt_chart_menu () {
+	$items = array();
+	$items['controlm/gantt_chart'] = array(
+		'title' => 'Gantt Chart',
+		'page callback' => 'controlm_gantt_chart_execute',
+		'access arguments' => array('access controlm content'),
+		'type' => MENU_NORMAL_ITEM,
+	);
+	return $items;
+}
+function controlm_gantt_chart_execute() {
+	$arr = drupal_get_form('controlm_gantt_chart_form');
+	$markup = drupal_render($arr);
+	return array('#markup' => '<p>' . t($markup) . '</p>');
+}
+function controlm_gantt_chart_form ($form, &$form_state) {
+	db_set_active('bip');
+	$app_options = array('' => '');
+	$grp_options = array('' => '');
+	//Get Application List
+	$query = db_select('cm_job_info','cji')->fields('cji',array('cmji_application'))->distinct()->orderBy('cmji_application');
+	$result = $query->execute();
+	while($record = $result->fetchAssoc()) {
+		$app_options[$record['cmji_application']] = $record['cmji_application'];
+	}
+	//Get Group List
+	$query = db_select('cm_job_info','cji')->fields('cji',array('cmji_group'))->distinct()->orderBy('cmji_group');
+	$result = $query->execute();
+	while($record = $result->fetchAssoc()) {
+		$grp_options[$record['cmji_group']] = $record['cmji_group'];
+	}
+
+	db_set_active();
+
+	$form = array();
+	$form['group1'] = array(
+		'#type' => 'fieldset',
+		'#title' => t('Search Parameters'),
+		'#collapsible' => TRUE,
+		'#collapsed' => FALSE,
+	);
+	$form['application_options'] = array(
+		'#type' => 'value',
+		'#value' => $app_options,
+	);
+	$form['group1']['application'] = array(
+		'#title' => t('Application'),
+		'#type' => 'select',
+		'#options' => $form['application_options']['#value'],
+	);
+	$form['group_options'] = array(
+		'#type' => 'value',
+		'#value' => $grp_options,
+	);
+	$form['group1']['group'] = array(
+		'#title' => t('Group'),
+		'#type' => 'select',
+		'#options' => $form['group_options']['#value'],
+	);
+	$form['group1']['startdate'] = array(
+		'#type' => 'date_popup',
+		'#title' => t('Start Date'),
+		'#default_value' => date('Y-m-d H:i:s',strtotime('24 hours ago')),
+		'#date_format' => 'Y-m-d H:i:s',
+		'#date_increment' => 1,
+	);
+	$form['group1']['enddate'] = array(
+		'#type' => 'date_popup',
+		'#title' => t('End Date'),
+		'#default_value' => date('Y-m-d H:i:s',strtotime('now')),
+		'#date_format' => 'Y-m-d H:i:s',
+		'#date_increment' => 1,
+	);
+	$form['group2']['submit'] = array(
+		'#value' => t('Search'),
+		'#type' => 'submit',
+		'#submit' => array('controlm_gantt_chart_form_submit'),
+	);
+	
+	if(isset($form_state['storage']['results'])) {
+		$form['results'] = $form_state['storage']['results'];
+	}
+
+	return $form;
+}
+function controlm_gantt_chart_form_submit ($form, &$form_state) {
+
+	ini_set('memory_limit','1G');
+	ini_set('max_execution_time',0);
+
+	if($form_state['values']['application'] == '' && $form_state['values']['group'] == '') {
+		drupal_set_message(t('Either Application or Group must be selected.'),'warning');
+		return;
+	}
+	if($form_state['values']['application'] != '') {
+		$where['cmji_application'] = $form_state['values']['application'];
+	}
+	if($form_state['values']['group'] != '') {
+		$where['cmji_group'] = $form_state['values']['group'];
+	}
+
+	db_set_active('bip');
+	$query = db_select('cm_jobs_run','cjr');
+	$query->leftJoin('cm_job_info','cji',"cmjr_job_name =cmji_jobname AND cmjr_node_id LIKE concat( left( cmji_nodeid, 12 ) , '%' )");
+	$query->fields('cjr',array('cmjr_job_name','cmjr_node_id','cmjr_elapsed_time'));
+	$query->addExpression('UNIX_TIMESTAMP(cmjr_timestamp)','cmjr_timestamp');
+	$query->addExpression('UNIX_TIMESTAMP(cmjr_timestamp - INTERVAL cmjr_elapsed_time SECOND)','cmjr_start_time');
+	foreach($where as $k => $v) {
+		$query->condition($k,$v,'=');
+	}
+	$query->condition(db_or()->where("cmjr_timestamp BETWEEN '".$form_state['values']['startdate']."' AND '".$form_state['values']['enddate']."'")
+				->where("cmjr_timestamp - INTERVAL cmjr_elapsed_time SECOND BETWEEN '".$form_state['values']['startdate']."' AND '".$form_state['values']['enddate']."'"));
+	$query->orderBy('cmjr_start_time')->orderBy('cmjr_elapsed_time');
+	$result = $query->execute();
+	
+
+	$chart = <<<EOF
+<script type="text/javascript" src="https://www.google.com/jsapi?autoload={'modules':[{'name':'visualization',
+       'version':'1','packages':['timeline']}]}"></script>
+<script type="text/javascript">
+
+google.setOnLoadCallback(drawChart);
+
+function drawChart() {
+
+  var container = document.getElementById('example5.1');
+  var chart = new google.visualization.Timeline(container);
+  var dataTable = new google.visualization.DataTable();
+  dataTable.addColumn({ type: 'string', id: 'Node' });
+  dataTable.addColumn({ type: 'string', id: 'Label' });
+  dataTable.addColumn({ type: 'date', id: 'Start' });
+  dataTable.addColumn({ type: 'date', id: 'End' });
+  dataTable.addRows([
+EOF;
+
+	if((strtotime($form_state['values']['startdate']) - strtotime($form_state['values']['startdate'])) > 86400) {
+		$format = 'Y-m-d H:i:s';
+	} else {
+		$format = 'H:i:s';
+	}
+	while($record = $result->fetchAssoc()) {
+		$chart .= "    [ '".$record['cmjr_node_id']."', ";
+		$chart .= "'".$record['cmjr_job_name']." / ".$record['cmjr_elapsed_time']." sec', ";
+		$chart .= "new Date(".date('Y,m,d,H,i,s',$record['cmjr_start_time'])."), ";
+		$chart .= "new Date(".date('Y,m,d,H,i,s',$record['cmjr_timestamp']).") ],\n";
+	}
+	$chart = rtrim($chart,",\n");
+	$chart .= "]);\n";
+
+	$chart .= <<<EOF
+  var options = {
+    timeline: { singleColor: '#ff0000' },
+    avoidOverlappingGridLines: false
+  };
+
+  chart.draw(dataTable, options);
+  google.visualization.events.addListener(chart, 'select', myClickHandler);
+
+}
+
+function myClickHandler(e){
+  alert('You clicked ' + chart.getSelection().length + ' items.');
+}
+
+</script>
+<div id="example5.1" style="height: 10000px"></div>
+EOF;
+	//Set up render array
+        $markup = array(
+                '#type' => 'markup',
+                '#markup' => $chart,
+        );
+
+	//drupal_set_message($chart);
+	$form_state['storage']['results'] = $markup;
+        $form_state['rebuild'] = TRUE;
+
+	db_set_active();
+	return $markup;
+}
+

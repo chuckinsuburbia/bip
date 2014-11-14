@@ -3,12 +3,13 @@
 function controlm_create_job_average_menu () {
 	$items = array();
 	$items['admin/config/services/controlm/create_job_average'] = array(
-		'title' => 'Control-M Create Job Averages Table',
+		'title' => 'Update Job Averages',
 		'description' => 'Configuration for Control-M Create Job Averages module',
 		'page callback' => 'drupal_get_form',
 		'page arguments' => array('controlm_create_job_average_form'),
 		'access arguments' => array('access controlm administration'),
-		'type' => MENU_NORMAL_ITEM,
+		'type' => MENU_LOCAL_TASK,
+		'weight' => 7,
 	);
 	$items['controlm/create_job_average'] = array(
 		'title' => 'Create Job Averages Table',
@@ -76,7 +77,7 @@ function cmCreateJobAvg() {
 	$return .= "Done<br />";
 
 	$return .= "<br />Emptying DB table ".$tbl."...";
-	dbTblEmpty($tbl);
+	//dbTblEmpty($tbl);
 	$return .= "Done<br />";
 
 	$return .= "<br />Collecting Data on jobs run...";
@@ -94,7 +95,18 @@ function cmCreateJobAvg() {
 	$return .= "<br />Inserting data into Averages table...";
 	while($record = $result->fetchAssoc()) {
 //		$return .= "<pre>".print_r($record,TRUE)."</pre>";
-		$insert = db_insert($tbl)->fields($record)->execute();
+		$merge = db_merge($tbl);
+		$merge->key(array(
+			'cmja_job_name' => $record['cmja_job_name'],
+			'cmja_node_id' => $record['cmja_node_id'],
+			'cmja_dow' => $record['cmja_dow'],
+		));
+		$merge->fields(array(
+			'cmja_average' => $record['cmja_average'],
+			'cmja_min' => $record['cmja_min'],
+			'cmja_max' => $record['cmja_max'],
+		));
+		$merge->execute();
 		usleep(100); //Sleep for 100 microseconds so other queries don't get jammed up
 	}
 	$return .= "Done<br />";

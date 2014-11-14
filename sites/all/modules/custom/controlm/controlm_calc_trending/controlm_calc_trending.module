@@ -3,12 +3,13 @@
 function controlm_calc_trending_menu () {
 	$items = array();
 	$items['admin/config/services/controlm/calc_trending'] = array(
-		'title' => 'Control-M Calculate Trending',
+		'title' => 'Calculate Trending',
 		'description' => 'Configuration for Control-M Calculate Trending module',
 		'page callback' => 'drupal_get_form',
 		'page arguments' => array('controlm_calc_trending_form'),
 		'access arguments' => array('access controlm administration'),
-		'type' => MENU_NORMAL_ITEM,
+		'type' => MENU_LOCAL_TASK,
+		'weight' => 6,
 	);
 	$items['controlm/calc_trending'] = array(
 		'title' => 'Calculate Trending',

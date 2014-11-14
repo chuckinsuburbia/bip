@@ -1,0 +1,21 @@
+
+;----------// Theme info
+
+  name        = Bare
+  description = Bare Bones Theme
+  core        = 7.x
+  release     = 7.x-3.x
+  engine      = phptemplate
+
+
+
+;----------// CSS
+
+;----------// Regions
+
+  regions[content]           = Main content
+
+  ; Hidden regions (required by Drupal core)
+  regions[page_top]          = Page top
+  regions[page_bottom]       = Page bottom
+

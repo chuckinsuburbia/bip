@@ -1,0 +1,8 @@
+name = Oracle Purge DB
+description = This module contains functions to purge database tables of unneeded entries
+core = 7.x
+package = "oracle"
+configure = admin/config/services/oracle/purge_db
+dependencies[] = oracle_base
+
+version = "7.x-X.X"

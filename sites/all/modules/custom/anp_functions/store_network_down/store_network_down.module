@@ -103,10 +103,11 @@ function store_network_down_execute() {
 
 	//Links
 	$links = variable_get('store_network_down_links',array());
-	$linkhtml = "";
+	$linkhtml = "<ul>";
 	foreach($links as $link) {
-		$linkhtml .= "<a href='".$link['url']."'>".$link['description']."</a>&nbsp;&nbsp;";
+		$linkhtml .= "<li><a href='".$link['url']."' target='_blank'>".$link['description']."</a></li>";
 	}
+	$linkhtml .= "</ul>";
 	$markup['content'][] = array('#prefix' => '<p>','#markup' => t($linkhtml),'#suffix' => '</p>');
 
 	db_set_active('nagios');
@@ -135,7 +136,7 @@ function store_network_down_execute() {
 	$query->leftJoin('sites','s','s.s_division = substr(hs.host_name, 1,2) and s.s_store = substr(hs.host_name,3,3)');
 	$query->leftJoin('StoreInfo','si','CAST(si.store AS CHAR) = hs.host_name');
 	$query->leftJoin('sc_store_data','sc','hs.host_name = sc.location');
-	$query->addField('hs','host_name','Store');
+	$query->addExpression("concat('<a href=\"https://nagios.corp.gaptea.com/nagios-ro/cgi-bin/status.cgi?host=',hs.host_name,'\" target=\"_new\">',hs.host_name,'</a>')",'Store');
 	$query->addField('si','city','City');
 	$query->addField('si','siteid','SiteID');
 	$query->addField('sn1','ServiceName','Pri');
@@ -151,7 +152,6 @@ function store_network_down_execute() {
 	$result = $query->execute();
 
 	while($record = $result->fetchAssoc()) {
-		//$markup .= "<pre>".print_r($record,TRUE)."</pre>";
 		$hostdown['#header'] = array_keys($record);
 		$hostdown['#rows'][] = array_values($record);
 	}
@@ -172,7 +172,7 @@ function store_network_down_execute() {
 	$query->leftJoin('sites','s','s.s_division = substr(ss.host_name, 1,2) and s.s_store = substr(ss.host_name,3,3)');
 	$query->leftJoin('StoreInfo','si','CAST(si.store AS CHAR) = ss.host_name');
 	$query->leftJoin('sc_store_data','sc','hs.host_name = sc.location');
-	$query->addExpression("concat('<a href=\"https://nagios/nagios-ro/cgi-bin/status.cgi?host=',ss.host_name,'\" target=\"_new\">',ss.host_name,'</a>')",'Store');
+	$query->addExpression("concat('<a href=\"https://nagios.corp.gaptea.com/nagios-ro/cgi-bin/status.cgi?host=',ss.host_name,'\" target=\"_new\">',ss.host_name,'</a>')",'Store');
 	$query->addField('si','city','City');
 	$query->addField('si','siteid','SiteID');
 	$query->addField('sn1','ServiceName','Pri');
@@ -192,7 +192,6 @@ function store_network_down_execute() {
 	$result = $query->execute();
 
 	while($record = $result->fetchAssoc()) {
-		//$markup .= "<pre>".print_r($record,TRUE)."</pre>";
 		$pridown['#header'] = array_keys($record);
 		$pridown['#rows'][] = array_values($record);
 	}
@@ -213,7 +212,7 @@ function store_network_down_execute() {
 	$query->leftJoin('sites','s','s.s_division = substr(ss.host_name, 1,2) and s.s_store = substr(ss.host_name,3,3)');
 	$query->leftJoin('StoreInfo','si','CAST(si.store AS CHAR) = ss.host_name');
 	$query->leftJoin('sc_store_data','sc','hs.host_name = sc.location');
-	$query->addExpression("concat('<a href=\"https://nagios/nagios-ro/cgi-bin/status.cgi?host=',ss.host_name,'\" target=\"_new\">',ss.host_name,'</a>')",'Store');
+	$query->addExpression("concat('<a href=\"https://nagios.corp.gaptea.com/nagios-ro/cgi-bin/status.cgi?host=',ss.host_name,'\" target=\"_new\">',ss.host_name,'</a>')",'Store');
 	$query->addField('si','city','City');
 	$query->addField('si','siteid','SiteID');
 	$query->addField('sn1','ServiceName','Backup');

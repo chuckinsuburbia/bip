@@ -1,0 +1,42 @@
+<?php
+
+function oracle_base_menu () {
+	$items = array();
+	$items['oracle'] = array(
+		'title' => 'Oracle',
+		'page callback' => 'oracle_base_description',
+		'access arguments' => array('access oracle content'),
+		//'expanded' => TRUE,
+	);
+        $items['admin/config/services/oracle'] = array(
+                'title' => 'Oracle',
+                'description' => 'Configuration for Oracle Module',
+                'page callback' => 'drupal_get_form',
+                'page arguments' => array('oracle_base_form'),
+                'access arguments' => array('access oracle administration'),
+                'type' => MENU_NORMAL_ITEM,
+        );
+        $items['admin/config/services/oracle/default'] = array(
+                'type' => MENU_DEFAULT_LOCAL_TASK,
+                'title' => 'Base',
+                'weight' => 1,
+        );
+	return $items;
+}
+function oracle_base_description() {
+	return array('#markup' => '<p>' . t('Place Holder') . '</p>');
+}
+
+function oracle_base_form() {
+	return array('#markup' => '<p>' . t('Place Holder') . '</p>');
+}
+
+function oracle_base_permission() {
+	return array(
+		'access oracle content' => array( 'title' => t('Access content for the Oracle module'), ),
+		'access oracle administration' => array( 'title' => t('Administer the Oracle Module'), ),
+		'access oracle data feeds' => array( 'title' => t('Access data feeds for the Oracle module'), ),
+        );
+}
+
+

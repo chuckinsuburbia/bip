@@ -3,12 +3,13 @@
 function controlm_fetch_runtimes_menu () {
 	$items = array();
 	$items['admin/config/services/controlm/fetch_runtimes'] = array(
-		'title' => 'Control-M Fetch Run Times',
+		'title' => 'Fetch Run Times',
 		'description' => 'Configuration for Control-M Fetch Run Times module',
 		'page callback' => 'drupal_get_form',
 		'page arguments' => array('controlm_fetch_runtimes_form'),
 		'access arguments' => array('access controlm administration'),
-		'type' => MENU_NORMAL_ITEM,
+		'type' => MENU_LOCAL_TASK,
+		'weight' => 5,
 	);
 	$items['controlm/fetch_runtimes'] = array(
 		'title' => 'Fetch Run Time Data',

@@ -3,7 +3,7 @@ description = This module contains functions to fetch the Control-M extract prov
 core = 7.x
 package = "control-m"
 configure = admin/config/services/controlm/fetch_extract
-dependencies[] = controlm_wsdl_client
+dependencies[] = controlm_base
 dependencies[] = db_table_backup
 
 version = "7.x-X.X"

@@ -3,12 +3,13 @@
 function controlm_fetch_extract_menu () {
 	$items = array();
 	$items['admin/config/services/controlm/fetch_extract'] = array(
-		'title' => 'Control-M Fetch Extract',
+		'title' => 'Fetch Extract',
 		'description' => 'Configuration for Control-M Fetch Extract module',
 		'page callback' => 'drupal_get_form',
 		'page arguments' => array('controlm_fetch_extract_form'),
 		'access arguments' => array('access controlm administration'),
-		'type' => MENU_NORMAL_ITEM,
+		'type' => MENU_LOCAL_TASK,
+		'weight' => 3,
 	);
 	$items['controlm/fetch_extract'] = array(
 		'title' => 'Fetch Extract Data',

@@ -2,5 +2,7 @@ name = Control-M
 description = This module contains functions to define basic structure & permissions for controlm
 core = 7.x
 package = "control-m"
+configure = admin/config/services/controlm/wsdl_client
+dependencies[] = nusoap_include
 
 version = "7.x-X.X"

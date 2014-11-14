@@ -1,6 +1,0 @@
-name = SoftGrocer Base
-description = This module contains base menu items for Oracle 
-core = 7.x
-package = "anp_functions"
-
-version = "7.x-X.X"

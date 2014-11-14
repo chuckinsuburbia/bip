@@ -56,7 +56,7 @@ function google_chart_tools_page() {
     'options' => array( // Optionals.
       'curveType' => "function",
       'forceIFrame' => FALSE,
-      'title' => 'Nodes / Comments / Votes / Users per day',
+      'title' => $_REQUEST['job_name'].' Execution Time',
       'width' => 800,
       'height' => 400
     )

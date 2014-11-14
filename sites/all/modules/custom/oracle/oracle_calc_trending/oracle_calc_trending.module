@@ -1,0 +1,188 @@
+<?php
+
+function oracle_calc_trending_menu () {
+	$items = array();
+	$items['admin/config/services/oracle/calc_trending'] = array(
+		'title' => 'Calculate Trending',
+		'description' => 'Configuration for Oracle Calculate Trending module',
+		'page callback' => 'drupal_get_form',
+		'page arguments' => array('oracle_calc_trending_form'),
+		'access arguments' => array('access administration pages'),
+		'type' => MENU_LOCAL_TASK,
+		'weight' => 2,
+	);
+	$items['oracle/calc_trending'] = array(
+		'title' => 'Calculate Trending',
+		'page callback' => 'oracle_calc_trending_execute',
+		'access arguments' => array('access administration pages'),
+		'type' => MENU_NORMAL_ITEM,
+	);
+	return $items;
+}
+function oracle_calc_trending_execute() {
+  return array('#markup' => '<p>' . t(oraCalcTrending()) . '</p>');
+}
+function oracle_calc_trending_form ($form, &$form_state) {
+	$form['oracle_calc_trending_num_execs'] = array(
+		'#type' => 'textfield',
+		'#title' => t('Number of Executions'),
+		'#default_value' => variable_get('oracle_calc_trending_num_execs',10),
+		'#size' => 10,
+		'#maxlength' => 10,
+		'#description' => t('The number of job executions to count in trending.'),
+		'#required' => TRUE,		
+	);
+	$form['oracle_calc_trending_alarm_threshold'] = array(
+		'#type' => 'textfield',
+		'#title' => t('Alarm Threshold'),
+		'#default_value' => variable_get('oracle_calc_trending_alarm_threshold','0.2'),
+		'#size' => 10,
+		'#maxlength' => 10,
+		'#description' => t('Threshold of trend change to set Alarm.'),
+		'#required' => TRUE,		
+	);
+	$form['oracle_calc_trending_cron'] = array(
+		'#type' => 'checkbox',
+		'#title' => t('Run during Cron?'),
+		'#default_value' => variable_get('oracle_calc_trending_cron',1),
+		'#description' => t('Do we want to run periodically through cron?'),
+		'#required' => FALSE,
+	);
+	$form['oracle_calc_trending_interval'] = array(
+		'#type' => 'textfield',
+		'#title' => t('Cron Interval'),
+		'#default_value' => variable_get('oracle_calc_trending_interval',3600),
+		'#size' => 10,
+		'#maxlength' => 10,
+		'#description' => t('The number of seconds between Cron executions.'),
+		'#required' => TRUE,
+	);
+	return system_settings_form($form);
+}
+function oracle_calc_trending_form_validate ($form, &$form_state) {
+	if(!ctype_digit(strval($form_state['values']['oracle_calc_trending_interval']))) {
+		form_set_error('oracle_calc_trending_interval', t('Interval value must be an integer.'));
+	}
+	if($form_state['values']['oracle_calc_trending_interval'] <= 0) {
+		form_set_error('oracle_calc_trending_interval', t('Interval value must be greater than zero.'));
+	}
+	if(!ctype_digit(strval($form_state['values']['oracle_calc_trending_num_execs']))) {
+		form_set_error('oracle_calc_trending_num_execs', t('Number of Executions value must be an integer.'));
+	}
+	if($form_state['values']['oracle_calc_trending_num_execs'] <= 0) {
+		form_set_error('oracle_calc_trending_num_execs', t('Number of executions value must be greater than zero.'));
+	}
+	if(!is_numeric($form_state['values']['oracle_calc_trending_alarm_threshold'])) {
+		form_set_error('oracle_calc_trending_alarm_threshold', t('Alarm Threshold value must be an integer.'));
+	}
+	if($form_state['values']['oracle_calc_trending_alarm_threshold'] < 0) {
+		form_set_error('oracle_calc_trending_alarm_threshold', t('Alarm Threshold must be greater or equal to than zero.'));
+	}
+}
+function oracle_calc_trending_cron() {
+	$enabled = variable_get('oracle_calc_trending_cron',0);
+	if($enabled = 1) {
+		$interval = variable_get('oracle_calc_trending_interval',3600);
+		if (time() >= variable_get('oracle_calc_trending_next_execution', 0)) {
+			drupal_set_time_limit(0);
+			$res = oraCalcTrending();
+			watchdog('oracle_calc_trending', 'oracle_calc_trending_cron ran');
+			variable_set('oracle_calc_trending_next_execution', time() + $interval);
+		}
+	}
+}
+
+
+function oraCalcTrending() {
+
+	ini_set('memory_limit','2G');
+	ini_set('max_execution_time',0);
+
+	db_set_active('bip');
+
+	$num_execs = variable_get('oracle_calc_trending_num_execs',10);
+	$threshold = variable_get('oracle_calc_trending_alarm_threshold','0.2');
+
+	$return = "";
+	$return .= "<p>Threshold: ".$threshold."<br />";
+	$return .= "Number of executions to count: ".$num_execs."</p>";
+
+	$rs_trends = db_select('ora_size_trend','ost')->fields('ost',array('ost_db','ost_owner','ost_segment','ost_segment_type','ost_trend'))->execute();
+	while($rec_trends = $rs_trends->fetchAssoc()) {
+		$trends[$rec_trends['ost_db']][$rec_trends['ost_owner']][$rec_trends['ost_segment']][$rec_trends['ost_segment_type']] = $rec_trends['ost_trend'];
+	}
+	$rs_segments = db_select('ora_segment_size','oss')->distinct()->fields('oss',array('oss_db','oss_owner','oss_segment','oss_segment_type'))->execute();
+	while($rec_segment = $rs_segments->fetchAssoc()) {
+		$rs_segment_sizes = db_select('ora_segment_size','oss')
+			->fields('oss',array('oss_date','oss_size'))
+			->condition('oss_db',$rec_segment['oss_db'],'=')
+			->condition('oss_owner',$rec_segment['oss_owner'],'=')
+			->condition('oss_segment',$rec_segment['oss_segment'],'=')
+			->condition('oss_segment_type',$rec_segment['oss_segment_type'],'=')
+			->orderBy('oss_date','DESC')
+			->range(0,$num_execs)
+			->execute();
+		while($rec_segment_size = $rs_segment_sizes->fetchAssoc()) {
+			$ora_db[$rec_segment['oss_db']][$rec_segment['oss_owner']][$rec_segment['oss_segment']][$rec_segment['oss_segment_type']][] = array('date' => $rec_segment_size['oss_date'],'size' =>$rec_segment_size['oss_size']);
+		}
+	}
+
+	foreach($ora_db as $dbname => $owners) {
+		foreach($owners as $owner => $segments) {
+			foreach($segments as $segment => $segment_types) {
+				foreach($segment_types as $segment_type => $sizetimes) {
+					$update = FALSE;
+					if(!isset($trends[$dbname][$owner][$segment][$segment_type])) {
+						$trends[$dbname][$owner][$segment][$segment_type] = "";
+						$update = TRUE;
+						$alarm_txt = NULL;
+						$trend = 0;
+					}
+
+					$size = $sizetimes[0]['size'];
+					$growth = $size - $sizetimes[count($sizetimes)-1]['size'];
+
+					foreach($sizetimes as $k => $v) {
+						$arrayX[] = $k;
+						$arrayY[] = $v['size'];
+					}
+					$trend = corrCoef($arrayX,$arrayY)*-1;
+					unset($arrayX); unset($arrayY);
+
+					if($trend > $threshold) {
+						$update = TRUE;
+						$alarm_txt = "TREND_UP";
+					} elseif($trend < -1*$threshold) {
+						$update = TRUE;
+						$alarm_txt = "TREND_DOWN";
+					} else {
+						$update = TRUE;
+						$alarm_txt = NULL;
+					}
+					
+					if($update) {
+						$return .= "<p>".$dbname."|".$owner."|".$segment."|".$segment_type." = ".$trend." - ".$alarm_txt."</p>";
+						$keys = array(
+							'ost_db' => $dbname,
+							'ost_owner' => $owner,
+							'ost_segment' => $segment,
+							'ost_segment_type' => $segment_type,
+						);
+						$fields = array(
+							'ost_size' => $size,
+							'ost_growth' => $growth,
+							'ost_trend' => round($trend,4),
+							'ost_alarm' => $alarm_txt,
+						);
+						db_merge('ora_size_trend')->key($keys)->fields($fields)->execute();
+					}
+				}
+			}
+		}
+	}
+	//$return .= "<pre>".print_r($ora_db,TRUE)."</pre>";
+	
+	db_set_active();
+	return($return);
+}
+

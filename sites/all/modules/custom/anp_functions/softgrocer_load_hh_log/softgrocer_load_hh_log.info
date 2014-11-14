@@ -1,8 +1,0 @@
-name = SoftGrocer Load HandHeld Logs
-description = This module loads handheld error logs into BIP database
-core = 7.x
-package = "anp_functions"
-configure = admin/config/services/softgrocer_load_hh_log
-dependencies[] = softgrocer_base
-
-version = "7.x-X.X"

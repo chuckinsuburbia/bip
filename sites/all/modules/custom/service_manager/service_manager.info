@@ -4,5 +4,7 @@ core = 7.x
 package = "service_manager"
 configure = admin/config/services/service_manager
 dependencies[] = nusoap_include
+dependencies[] = ctools
+dependencies[] = ldap
 
 version = "7.x-X.X"
