@@ -1,0 +1,212 @@
+<?php
+
+function controlm_execute_request_menu () {
+	$items = array();
+	$items['controlm/execute_request'] = array(
+		'title' => 'Execute Jobs on Confirm',
+		'page callback' => 'controlm_execute_request_page',
+		'access arguments' => array('access controlm content'),
+		'type' => MENU_NORMAL_ITEM,
+	);
+	$items['ajax/controlm/execute_request/list_jobs'] = array(
+		'page callback' => 'controlm_execute_request_list_jobs_get_ajax',
+		'delivery callback' => 'controlm_execute_request_list_jobs_ajax_callback',
+		'access arguments' => array('access controlm content'),
+		'type' => MENU_CALLBACK,
+	);
+	$items['ajax/controlm/execute_request/ctmwhy'] = array(
+		'page callback' => 'controlm_execute_request_ctmwhy_get_ajax',
+		'delivery callback' => 'controlm_execute_request_ctmwhy_ajax_callback',
+		'access arguments' => array('access controlm content'),
+		'type' => MENU_CALLBACK,
+	);
+	$items['ajax/controlm/execute_request/freejob'] = array(
+		'page callback' => 'controlm_execute_request_freejob_get_ajax',
+		'delivery callback' => 'controlm_execute_request_freejob_ajax_callback',
+		'access arguments' => array('access controlm content'),
+		'type' => MENU_CALLBACK,
+	);
+	$items['ajax/controlm/execute_request/confirmjob'] = array(
+		'page callback' => 'controlm_execute_request_confirmjob_get_ajax',
+		'delivery callback' => 'controlm_execute_request_confirmjob_ajax_callback',
+		'access arguments' => array('access controlm content'),
+		'type' => MENU_CALLBACK,
+	);
+	return $items;
+}
+function controlm_execute_request_page() {
+	if(user_is_anonymous()) {
+		return array('#markup' => '<p>You must log in to use this function.</p>');
+	}
+
+	drupal_add_library('system', 'drupal.ajax');
+
+	$markup = "";
+
+	$markup .= '<code><div id="ajax-target-command-status"></div></code>';
+	$markup .= '<div id="ajax-target-job-list">Please wait one moment...</div>';
+	$markup .= '<script>function controlm_execute_request_list_jobs_ajax_load() { jQuery("#ajax-target-job-list").load("/ajax/controlm/execute_request/list_jobs"); } ';
+	$markup .= 'function controlm_execute_request_ctmwhy_ajax_load(jobname,orderid) { jQuery("#ajax-target-command-status").load("/ajax/controlm/execute_request/ctmwhy/" + jobname + "/" + orderid); } ';
+	$markup .= 'function controlm_execute_request_freejob_ajax_load(jobname,orderid) { jQuery("#ajax-target-command-status").load("/ajax/controlm/execute_request/freejob/" + jobname + "/" + orderid); } ';
+	$markup .= 'function controlm_execute_request_confirmjob_ajax_load(jobname,orderid) { jQuery("#ajax-target-command-status").load("/ajax/controlm/execute_request/confirmjob/" + jobname + "/" + orderid); } ';
+	$markup .= 'function scrollToTop() { jQuery("html, body").animate({ scrollTop: 0 }, "fast"); } ';
+	$markup .= 'jQuery(document).ready(function($){controlm_execute_request_list_jobs_ajax_load();});</script>';
+
+	return(array('#markup' => t($markup)));
+}
+function controlm_execute_request_list_jobs_get_ajax() {
+	global $user;
+	$return = "";
+
+	//Get list of assignment groups the user belongs to
+	$tax_array = taxonomy_get_vocabularies();
+	foreach($tax_array as $tax) {
+		$taxonomies[$tax->machine_name] = $tax->vid;
+	}
+	$query = new EntityFieldQuery;
+	$tax_result = $query->entityCondition('entity_type', 'taxonomy_term')
+		->fieldCondition('field_group_members','value',$user->name)
+		->propertyCondition('vid', $taxonomies['service_center_groups'])
+		->execute();
+	if(count($tax_result) == 0) {
+		return "You are not a member of any Service Center groups.";
+	}
+	foreach($tax_result['taxonomy_term'] as $term) {
+		$groups[$term->tid] = taxonomy_term_load($term->tid)->name;
+	}
+//	$return .= "<pre>".print_r($groups,TRUE)."</pre>";
+
+	//Get list of all jobs assigned to user's groups
+	foreach($groups as $tid => $groupname) {
+		$query = new EntityFieldQuery();
+		$query->entityCondition('entity_type','node');
+		$query->propertyCondition('type','job_document');
+		$query->propertyCondition('status', 1);
+		$query->fieldCondition('field_service_center_group', 'tid', $tid, '=');
+		$jd_result = $query->execute();
+		if(isset($jd_result['node']) && is_array($jd_result['node'])) {
+			foreach($jd_result['node'] as $jobdoc) {
+				$title = strtolower(node_load($jobdoc->nid,$jobdoc->vid)->title);
+				$jobdocs[$title] = node_load($jobdoc->nid,$jobdoc->vid);
+				$userjobs[$groupname][$jobdoc->nid] = $title;
+			}
+		}
+	}
+//	$return .= "<pre>".print_r($jobdocs,TRUE)."</pre>";
+
+	//Query DB for jobs in Wait User status
+	db_set_active('bip');
+	foreach($userjobs as $groupname => $groupjobs) {
+		$query = db_select('cm_job_status','cjs');
+		$query->fields('cjs');
+		$query->condition('cmjs_job_name',$groupjobs,'IN');
+		$query->condition('cmjs_status','Wait User','=');
+		$query->orderBy('cmjs_job_name');
+		$result = $query->execute();
+		while($record = $result->fetchAssoc()) {
+			$jobname = strtolower($record['CMJS_JOB_NAME']);
+			$waitjobs[$groupname][$jobname] = array('status' => $record, 'jobdoc' => $jobdocs[$jobname]);
+		}
+	}	
+	db_set_active();
+//	$return .= "<pre>".print_r($waitjobs,TRUE)."</pre>";
+
+	//Set up render array
+	foreach($waitjobs as $groupname => $jobs) {
+		$return .= "<h3>".$groupname."</h3>";
+		$table = array(
+			'#theme' => 'table',
+			'#header' => array(t('Job Name'),t('Node'),t('Order Date'),t('Status'),t('State'),t('Command Line'),t('Doc'),t('Info'),''),
+			'#rows' => array(),
+		);
+		foreach($jobs as $jobname => $jobprop) {
+			$table['#rows'][] = array(
+				t($jobprop['status']['CMJS_JOB_NAME']),
+				t($jobprop['status']['CMJS_NODE_ID']),
+				t($jobprop['status']['CMJS_ODATE']),
+				t($jobprop['status']['CMJS_STATUS']),
+				t($jobprop['status']['CMJS_STATE']),
+				array('data' => t($jobprop['jobdoc']->field_command_line['und'][0]['value']),'style' => 'word-break:break-all;'),
+				t("<a href='/".drupal_get_path_alias('node/'.$jobprop['jobdoc']->nid)."'>Doc</a>"),
+				t('<a href="/job-information?job_name='.$jobprop['status']['CMJS_JOB_NAME'].'" target="_blank">Info</a>'),
+				t('<a href="#" onclick="controlm_execute_request_ctmwhy_ajax_load(\''.$jobprop['status']['CMJS_JOB_NAME'].'\',\''.$jobprop['status']['CMJS_ORDER_ID'].'\');scrollToTop();">Why</a>'),
+			);
+		}
+		$return .= theme('table',$table);
+		$return .= "<br />";
+	}
+	
+	return $return;
+}
+function controlm_execute_request_list_jobs_ajax_callback($page_callback_result) {
+	echo($page_callback_result);
+}
+
+function controlm_execute_request_ctmwhy_get_ajax($jobname = '',$orderid = '') {
+	if($orderid == '') return;
+	$return = $jobname."<br />";
+
+	$client = new nusoap_client(variable_get('controlm_wsdl_client_url', ''), 'wsdl', false, false, false, false, 0, 600);
+	$err = $client->getError();
+	if ($err) {
+		return 'Constructor error<pre>'.$err.'</pre>';
+	}
+	$proxy = $client->getProxy();
+
+	$result = $proxy->ws_ctmWhy($orderid);
+	$return .= implode("<br />",$result)."<br />";
+	$return .= t('<a href="#" onclick="controlm_execute_request_ctmwhy_ajax_load(\''.$jobname.'\',\''.$orderid.'\');scrollToTop();">Reload Why</a><br />');
+	if(in_array('Job is waiting for confirmation.',$result)) {
+		$return .= t('<a href="#" onclick="return confirm(\'Confirm order ID '.$jobname.','.$orderid.'?\');controlm_execute_request_confirmjob_ajax_load(\''.$jobname.'\',\''.$orderid.'\');scrollToTop();">Confirm Job</a><br />');
+	}
+	if(in_array("Job is held.", $result)) {
+		$return .= t('<a href="#" onclick="controlm_execute_request_freejob_ajax_load(\''.$jobname.'\',\''.$orderid.'\');scrollToTop();">Free Job</a>');
+	}
+
+	return $return;
+}
+function controlm_execute_request_ctmwhy_ajax_callback($page_callback_result) {
+        echo($page_callback_result);
+}
+
+function controlm_execute_request_confirmjob_get_ajax($jobname = '',$orderid = '') {
+	if($orderid == '') return;
+	$return = "";
+
+	$client = new nusoap_client(variable_get('controlm_wsdl_client_url', ''), 'wsdl', false, false, false, false, 0, 600);
+	$err = $client->getError();
+	if ($err) {
+		return 'Constructor error<pre>'.$err.'</pre>';
+	}
+	$proxy = $client->getProxy();
+
+	$result = $proxy->confirmJob($orderid);
+	$return .= implode("<br />",$result)."<br />";
+	$return .= t('<a href="#" onclick="controlm_execute_request_ctmwhy_ajax_load(\''.$jobname.'\',\''.$orderid.'\');scrollToTop();">Why</a><br />');
+
+	return $return;
+}
+function controlm_execute_request_confirmjob_ajax_callback($page_callback_result) {
+        echo($page_callback_result);
+}
+
+function controlm_execute_request_freejob_get_ajax($jobname = '',$orderid = '') {
+	if($orderid == '') return;
+	$return = "";
+
+	$client = new nusoap_client(variable_get('controlm_wsdl_client_url', ''), 'wsdl', false, false, false, false, 0, 600);
+	$err = $client->getError();
+	if ($err) {
+		return 'Constructor error<pre>'.$err.'</pre>';
+	}
+	$proxy = $client->getProxy();
+
+	$result = $proxy->freeJob($orderid);
+	$return .= implode("<br />",$result)."<br />";
+	$return .= t('<a href="#" onclick="controlm_execute_request_ctmwhy_ajax_load(\''.$jobname.'\',\''.$orderid.'\');scrollToTop();">Why</a><br />');
+
+	return $return;
+}
+function controlm_execute_request_freejob_ajax_callback($page_callback_result) {
+        echo($page_callback_result);
+}

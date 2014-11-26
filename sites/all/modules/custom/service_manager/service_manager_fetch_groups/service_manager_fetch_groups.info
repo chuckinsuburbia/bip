@@ -1,0 +1,8 @@
+name = Service Manager Fetch Assignment Groups
+description = This module contains functions to interact with HP Service Manager
+core = 7.x
+package = "service_manager"
+configure = admin/config/services/service_manager/fetch_groups
+dependencies[] = service_manager_base
+
+version = "7.x-X.X"

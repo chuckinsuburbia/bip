@@ -5,6 +5,6 @@ package = "service_manager"
 configure = admin/config/services/service_manager
 dependencies[] = nusoap_include
 dependencies[] = ctools
-dependencies[] = ldap
+dependencies[] = ldap_authentication
 
 version = "7.x-X.X"

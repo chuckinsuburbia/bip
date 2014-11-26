@@ -1,0 +1,8 @@
+name = Service Manager Check Job Documents
+description = This module contains functions to interact with HP Service Manager
+core = 7.x
+package = "service_manager"
+configure = admin/config/services/service_manager/check_jobdoc
+dependencies[] = service_manager_fetch_groups
+
+version = "7.x-X.X"

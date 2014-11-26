@@ -1,0 +1,9 @@
+name = Service Manager
+description = This module contains functions to interact with HP Service Manager
+core = 7.x
+package = "service_manager"
+configure = admin/config/services/service_manager/default
+dependencies[] = nusoap_include
+dependencies[] = ctools
+
+version = "7.x-X.X"

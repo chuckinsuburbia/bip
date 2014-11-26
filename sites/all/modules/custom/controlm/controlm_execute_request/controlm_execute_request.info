@@ -1,0 +1,7 @@
+name = Control-M Execute Request
+description = This module contains code to list held or waiting jobs for a user and allow user to free or confirm
+core = 7.x
+package = "control-m"
+dependencies[] = controlm_fetch_job_stats
+
+version = "7.x-X.X"

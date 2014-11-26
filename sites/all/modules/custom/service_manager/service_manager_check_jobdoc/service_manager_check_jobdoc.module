@@ -1,0 +1,122 @@
+<?php
+
+function service_manager_check_jobdoc_menu () {
+        $items = array();
+	$items['admin/config/services/service_manager/check_jobdoc'] = array(
+                'title' => 'Check Job Documents',
+                'description' => 'Configuration for Service Manager Check Job Documents module',
+                'page callback' => 'drupal_get_form',
+                'page arguments' => array('service_manager_check_jobdoc_form'),
+                'access arguments' => array('access controlm administration'),
+                'type' => MENU_LOCAL_TASK,
+                'weight' => 3,
+        );
+        $items['service_manager/check_jobdoc'] = array(
+                'title' => 'Check Job Documents',
+                'page callback' => 'service_manager_check_jobdoc_execute',
+                'access arguments' => array('access service_manager data feeds'),
+                'type' => MENU_NORMAL_ITEM,
+        );
+        return $items;
+}
+function service_manager_check_jobdoc_execute() {
+  return array('#markup' => '<p>' . t(_service_manager_check_jobdoc()) . '</p>');
+}
+
+function service_manager_check_jobdoc_form() {
+	$form['service_manager_check_jobdoc_cron'] = array(
+                '#type' => 'checkbox',
+                '#title' => t('Run during Cron?'),
+                '#default_value' => variable_get('service_manager_check_jobdoc_cron',1),
+                '#description' => t('Do we want to run the fetch periodically through cron?'),
+                '#required' => FALSE,
+        );
+        $form['service_manager_check_jobdoc_interval'] = array(
+                '#type' => 'textfield',
+                '#title' => t('Cron Interval'),
+                '#default_value' => variable_get('service_manager_check_jobdoc_interval',3600),
+                '#size' => 10,
+                '#maxlength' => 10,
+                '#description' => t('The number of seconds between Cron executions.'),
+                '#required' => TRUE,
+        );
+        return system_settings_form($form);
+}
+function service_manager_check_jobdoc_form_validate ($form, &$form_state) {
+        if(!ctype_digit(strval($form_state['values']['service_manager_check_jobdoc_interval']))) {
+                form_set_error('service_manager_check_jobdoc_interval', t('Interval value must be an integer.'));
+        }
+        if($form_state['values']['service_manager_check_jobdoc_interval'] <= 0) {
+                form_set_error('service_manager_check_jobdoc_interval', t('Interval value must be greater than zero.'));
+        }
+}
+
+function service_manager_check_jobdoc_cron() {
+        $enabled = variable_get('service_manager_check_jobdoc_cron',0);
+        if($enabled = 1) {
+                $interval = variable_get('service_manager_check_jobdoc_interval',3600);
+                if (time() >= variable_get('service_manager_check_jobdoc_cron_next_execution', 0)) {
+                        drupal_set_time_limit(0);
+                        $res = _service_manager_get_groups();
+                        watchdog('service_manager_fetch_groups', 'service_manager_check_jobdoc_cron ran');
+                        variable_set('service_manager_check_jobdoc_cron_next_execution', time() + $interval);
+                }
+        }
+}
+
+function service_manager_check_jobdoc_mail($key, &$message, $params) {
+    $data['user'] = $params['uid'];
+    $options['language'] = $message['language'];
+    user_mail_tokens($variables, $data, $options);
+    switch($key) {
+      case 'jobdoc':
+        $langcode = $message['language']->language;
+        $message['subject'] = t('Notification from '.variable_get('site_name'), $variables, array('langcode' => $langcode));
+        $message['body'][] = t($params['body'], $variables, array('langcode' => $langcode));
+        break;
+    }
+  }
+
+
+function _service_manager_check_jobdoc() {
+        $return = "";
+
+	$nodes = node_load_multiple(array(), array('type' => 'job_document'));
+	foreach($nodes as $node) {
+		if(isset($node->field_service_center_group['und'][0]['tid']) && taxonomy_term_load($node->field_service_center_group['und'][0]['tid'])) {
+//			$return .= "Job ".$node->title." assigned to valid group.<br />";
+		} else {
+			$bad_nodes[] = $node->nid;
+		}
+	}
+
+	if(isset($bad_nodes)) {
+	        $error_txt = "The following ".count($bad_nodes)." Job Documents specify an invalid Service Center assignment group.<br />\n";
+		$error_txt .= "Please update these pages as soon as possible in order to avoid improperly assigned tickets.<br />\n\n";
+		foreach($bad_nodes as $nid) {
+			$error_txt .= "<a href='".url(drupal_get_path_alias('node/'.$nid),array('absolute' => TRUE))."'>".$nodes[$nid]->title."</a><br />\n";
+		}
+		$return .= $error_txt;
+
+		//Look up members of Enterprise Scheduling role, and send them an email.
+		$params['body'] = $error_txt;
+		$role = user_role_load_by_name('Enterprise Scheduling');
+		$uids = db_select('users_roles', 'ur')
+			->fields('ur', array('uid'))
+			->condition('ur.rid', $role->rid, '=')
+			->execute()
+			->fetchCol();
+//		$users = user_load_multiple($uids);
+		$users = user_load_multiple(array(2));
+		foreach($users as $user) {
+			$params['uid'] = $user;
+			drupal_mail('service_manager_check_jobdoc','jobdoc',$user->mail,user_preferred_language($user),$params);
+		}
+//		$params['uid'] = 2;
+//		drupal_mail('service_manager_check_jobdoc','jobdoc','collishc@aptea.com','english',$params);
+	} else {
+		$return .= "All Job Document nodes have a valid assignment group.";
+	}
+
+        return($return);
+}

@@ -1,0 +1,165 @@
+<?php
+
+function service_manager_fetch_groups_menu () {
+        $items = array();
+	$items['admin/config/services/service_manager/fetch_groups'] = array(
+                'title' => 'Fetch Assignment Groups',
+                'description' => 'Configuration for Service Manager Fetch Assignment Groups module',
+                'page callback' => 'drupal_get_form',
+                'page arguments' => array('service_manager_fetch_groups_form'),
+                'access arguments' => array('access controlm administration'),
+                'type' => MENU_LOCAL_TASK,
+                'weight' => 2,
+        );
+        $items['service_manager/fetch_groups'] = array(
+                'title' => 'Fetch Assignment Groups',
+                'page callback' => 'service_manager_fetch_groups_execute',
+                'access arguments' => array('access service_manager data feeds'),
+                'type' => MENU_NORMAL_ITEM,
+        );
+        return $items;
+}
+function service_manager_fetch_groups_execute() {
+  return array('#markup' => '<p>' . t(_service_manager_get_groups()) . '</p>');
+}
+
+function service_manager_fetch_groups_form() {
+	$form['service_manager_fetch_groups_cron'] = array(
+                '#type' => 'checkbox',
+                '#title' => t('Run during Cron?'),
+                '#default_value' => variable_get('service_manager_fetch_groups_cron',1),
+                '#description' => t('Do we want to run the fetch periodically through cron?'),
+                '#required' => FALSE,
+        );
+        $form['service_manager_fetch_groups_interval'] = array(
+                '#type' => 'textfield',
+                '#title' => t('Cron Interval'),
+                '#default_value' => variable_get('service_manager_fetch_groups_interval',3600),
+                '#size' => 10,
+                '#maxlength' => 10,
+                '#description' => t('The number of seconds between Cron executions.'),
+                '#required' => TRUE,
+        );
+        return system_settings_form($form);
+}
+function service_manager_fetch_groups_form_validate ($form, &$form_state) {
+        if(!ctype_digit(strval($form_state['values']['service_manager_fetch_groups_interval']))) {
+                form_set_error('service_manager_fetch_groups_interval', t('Interval value must be an integer.'));
+        }
+        if($form_state['values']['service_manager_fetch_groups_interval'] <= 0) {
+                form_set_error('service_manager_fetch_groups_interval', t('Interval value must be greater than zero.'));
+        }
+}
+
+function service_manager_fetch_groups_cron() {
+        $enabled = variable_get('service_manager_fetch_groups_cron',0);
+        if($enabled = 1) {
+                $interval = variable_get('service_manager_fetch_groups_interval',3600);
+                if (time() >= variable_get('service_manager_fetch_groups_cron_next_execution', 0)) {
+                        drupal_set_time_limit(0);
+                        $res = _service_manager_get_groups();
+                        watchdog('service_manager_fetch_groups', 'service_manager_fetch_groups_cron ran');
+                        variable_set('service_manager_fetch_groups_cron_next_execution', time() + $interval);
+                }
+        }
+}
+
+
+
+function _service_manager_get_groups() {
+	@ini_set('implicit_flush', 1);
+	ob_implicit_flush(1);
+
+        $return = "";
+        $sc = variable_get('service_manager_assignment_wsdl_client_url', '');
+        $sc_user = variable_get('service_manager_username','');
+        $sc_pass = variable_get('service_manager_password','');
+
+        $client = new nusoap_client($sc, 'wsdl', false, false, false, false, 0, 600);
+        $err = $client->getError();
+        if ($err) {
+                return('<h2>Constructor error</h2><pre>' . $err . '</pre>');
+        }
+        $client->setCredentials($sc_user, $sc_pass);
+
+	//Get Assignment Groups from Service Manager
+        $query = '(AnpHelpdeskSelect="PC"|AnpHelpdeskSelect="STORE")';
+        $keys = new soapval('keys','AssignmentKeysType',"","http://servicecenter.peregrine.com/PWS",false,array("query" => $query));
+        $instance = new soapval("instance","AssignmentInstanceType","","http://servicecenter.peregrine.com/PWS");
+        $model = new soapval("model", "AssignmentModelType",array($keys,$instance),null,"http://servicecenter.peregrine.com/PWS");
+        $RetrieveLocationListRequest = new soapval("RetrieveAssignmentListRequest","RetrieveAssignmentListRequestType",$model,"http://servicecenter.peregrine.com/PWS");
+        $result = $client->call('RetrieveAssignmentList',$RetrieveLocationListRequest->serialize('literal'),"http://servicecenter.peregrine.com/PWS");
+
+        if ($client->fault) {
+                return("Client fault");
+        } else {
+                $err = $client->getError();
+                if ($err) {
+                        return("Client error: ".$err);
+                }
+        }
+
+	//Loop through results and put group names into new array
+	$named_result = array();
+	foreach($result['instance'] as $group) {
+		$named_result[$group['AssignmentName']] = $group;
+	}
+//	$return .= "<pre>".print_r($named_result,TRUE)."</pre>";
+
+	//Get List of defined Taxonomy terms
+	$tax_array = taxonomy_get_vocabularies();
+	foreach($tax_array as $tax) {
+		$taxonomies[$tax->machine_name] = $tax->vid;
+	}
+	$tax_tree = taxonomy_get_tree($taxonomies['service_center_groups']);
+
+	//Delete Taxonomy Terms that are not in the list of Service Manager Groups.
+	foreach($tax_tree as $term) {
+		$named_terms[$term->name] = taxonomy_term_load($term->tid);
+		if(!in_array($term->name,array_keys($named_result))) {
+			$return .= "Term ".$term->name." is not defined in Service Manager.  Deleting...";
+			taxonomy_term_delete($term->tid);
+			$return .= "Done.<br />";
+		}
+	}
+//	$return .= "<pre>".print_r($named_terms,TRUE)."</pre>";
+
+	foreach($named_result as $name => $group) {
+		$members = array();
+		if(isset($group['Operators'])) {
+			foreach($group['Operators'] as $operator) {
+				$members[]['value'] = $operator;
+			}
+		}
+		//Create new Taxonomy terms if they do not exist
+		if(!in_array($name,array_keys($named_terms))) {
+			$return .= "Group ".$name." is not defined in Drupal.  Creating...";
+			$new_term = array(
+				'vid' => $taxonomies['service_center_groups'],
+				'name' => $name,
+				'field_group_members' => array(
+					'und' => $members,
+				),
+			);
+			$new_term = (object) $new_term;
+			taxonomy_term_save($new_term);
+			$return .= "Done.<br />";
+		//Update group members
+		} else {
+			$return .= "Updating group members for ".$name."...";
+			$term = array(
+				'vid' => $taxonomies['service_center_groups'],
+				'name' => $name,
+				'tid' => $named_terms[$name]->tid,
+				'field_group_members' => array(
+					'und' => $members,
+				),
+			);
+			$term = (object) $term;
+			taxonomy_term_save($term);
+			$return .= "Done.<br />";
+		}
+	}
+
+        return($return);
+}
