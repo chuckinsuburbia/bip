@@ -32,6 +32,12 @@ function controlm_execute_request_menu () {
 		'access arguments' => array('access controlm content'),
 		'type' => MENU_CALLBACK,
 	);
+	$items['ajax/controlm/execute_request/pleasewait'] = array(
+		'page callback' => 'controlm_execute_request_pleasewait_get_ajax',
+		'delivery callback' => 'controlm_execute_request_pleasewait_ajax_callback',
+		'access arguments' => array('access controlm content'),
+		'type' => MENU_CALLBACK,
+	);
 	return $items;
 }
 function controlm_execute_request_page() {
@@ -45,7 +51,7 @@ function controlm_execute_request_page() {
 
 	$markup .= '<code><div id="ajax-target-command-status"></div></code>';
 	$markup .= '<div id="ajax-target-job-list">Please wait one moment...</div>';
-	$markup .= '<script>function controlm_execute_request_list_jobs_ajax_load() { jQuery("#ajax-target-job-list").load("/ajax/controlm/execute_request/list_jobs"); } ';
+	$markup .= '<script>function controlm_execute_request_list_jobs_ajax_load() { jQuery("#ajax-target-job-list").load("/ajax/controlm/execute_request/pleasewait"); jQuery("#ajax-target-job-list").load("/ajax/controlm/execute_request/list_jobs"); } ';
 	$markup .= 'function controlm_execute_request_ctmwhy_ajax_load(jobname,orderid) { jQuery("#ajax-target-command-status").load("/ajax/controlm/execute_request/ctmwhy/" + jobname + "/" + orderid); } ';
 	$markup .= 'function controlm_execute_request_freejob_ajax_load(jobname,orderid) { jQuery("#ajax-target-command-status").load("/ajax/controlm/execute_request/freejob/" + jobname + "/" + orderid); } ';
 	$markup .= 'function controlm_execute_request_confirmjob_ajax_load(jobname,orderid) { jQuery("#ajax-target-command-status").load("/ajax/controlm/execute_request/confirmjob/" + jobname + "/" + orderid); } ';
@@ -56,7 +62,7 @@ function controlm_execute_request_page() {
 }
 function controlm_execute_request_list_jobs_get_ajax() {
 	global $user;
-	$return = "";
+	$return = "<hr /><a href='#' onclick='controlm_execute_request_list_jobs_ajax_load();'>Reload Job List</a><br />";
 
 	//Get list of assignment groups the user belongs to
 	$tax_array = taxonomy_get_vocabularies();
@@ -208,5 +214,14 @@ function controlm_execute_request_freejob_get_ajax($jobname = '',$orderid = '') 
 	return $return;
 }
 function controlm_execute_request_freejob_ajax_callback($page_callback_result) {
+        echo($page_callback_result);
+}
+
+function controlm_execute_request_pleasewait_get_ajax() {
+	$return = "<hr />Please wait one moment...<br /><img src='".file_create_url('public://preloader.gif')."' width='50px' />";
+
+	return $return;
+}
+function controlm_execute_request_pleasewait_ajax_callback($page_callback_result) {
         echo($page_callback_result);
 }
