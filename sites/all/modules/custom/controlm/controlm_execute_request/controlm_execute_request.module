@@ -157,7 +157,7 @@ function controlm_execute_request_ctmwhy_get_ajax($jobname = '',$orderid = '') {
 	$return .= implode("<br />",$result)."<br />";
 	$return .= t('<a href="#" onclick="controlm_execute_request_ctmwhy_ajax_load(\''.$jobname.'\',\''.$orderid.'\');scrollToTop();">Reload Why</a><br />');
 	if(in_array('Job is waiting for confirmation.',$result)) {
-		$return .= t('<a href="#" onclick="return confirm(\'Confirm order ID '.$jobname.','.$orderid.'?\');controlm_execute_request_confirmjob_ajax_load(\''.$jobname.'\',\''.$orderid.'\');scrollToTop();">Confirm Job</a><br />');
+		$return .= t('<a href="#" onclick="controlm_execute_request_confirmjob_ajax_load(\''.$jobname.'\',\''.$orderid.'\');scrollToTop();">Confirm Job</a><br />');
 	}
 	if(in_array("Job is held.", $result)) {
 		$return .= t('<a href="#" onclick="controlm_execute_request_freejob_ajax_load(\''.$jobname.'\',\''.$orderid.'\');scrollToTop();">Free Job</a>');
