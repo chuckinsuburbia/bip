@@ -2,6 +2,20 @@
 // Corolla by Adaptivethemes.com
 
 /**
+* Add line breaks to field
+*/
+function corolla_preprocess_field(&$vars) {
+  if ($vars['element']['#field_type'] == 'text_long') {
+    $field_name = $vars['element']['#field_name'];
+    foreach ($vars['items'] as $key => &$item) {
+      if ($vars['element']['#object']->{$field_name}[LANGUAGE_NONE][$key]['format'] == NULL) {
+        $item['#markup'] = nl2br($item['#markup']);
+      }
+    }
+  }
+}
+
+/**
  * Override or insert vars into the html template.
  */
 function corolla_preprocess_html(&$vars) {
