@@ -109,7 +109,7 @@ function cmGetExport() {
 		foreach($table['JOB'] as $job) {
 			if(!isset($job['@attributes']) || !isset($job['@attributes']['JOBNAME'])) continue;
 			foreach($job['@attributes'] as $k => $v) {
-				$att['CMJI_'.$k] = $v;
+				$att['CMJI_'.$k] = trim($v);
 			}
 			$att['CMJI_TABLE_ID'] = $tblInsId;
 			$return .= "&nbsp;&nbsp;Inserting job ".$job['@attributes']['JOBNAME']." into cm_job_info...";
@@ -148,7 +148,7 @@ function cmInsertJobProperty($attributes,$property,$jobInsId,&$known_attr,&$know
 		$data = array(
 			'CMJP_JOB_ID' => $jobInsId,
 			'CMJP_TYPE' => $typeInsId,
-			'CMJP_VALUE' => $v,
+			'CMJP_VALUE' => trim($v),
 			'CMJP_NUM' => $num);
 		db_insert('cm_job_properties')->fields($data)->execute();
 		$return .= "Done<br />";
@@ -183,7 +183,7 @@ function cmInsertOnProperty($attributes,$onKey,$jobInsId,$typeInsId,&$known_attr
 				'CMJOP_JOB_ID' => $jobInsId,
 				'CMJOP_PROP_TYPE' => $typeInsId,
 				'CMJOP_ON_TYPE' => $onInsId,
-				'CMJOP_VALUE' => $v,
+				'CMJOP_VALUE' => trim($v),
 				'CMJOP_NUM' => $num,
 				'CMJOP_SUBNUM' => $subnum);
 			db_insert('cm_job_on_properties')->fields($data)->execute();

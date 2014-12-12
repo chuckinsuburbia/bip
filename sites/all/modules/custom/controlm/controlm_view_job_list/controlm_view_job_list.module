@@ -111,43 +111,15 @@ function controlm_view_job_list_form_submit ($form, &$form_state) {
 		}
 	}
 
-/*
-	//Get array of job docs
-	$query = new EntityFieldQuery();
-	$entities = $query->entityCondition('entity_type','node')->propertyCondition('type','job_document')->execute();
-	if (!empty($entities['node'])) {
-		foreach($entities['node'] as $ent_key => $ent_node) {
-			$node = node_load($ent_key);
-			$jobdocs[$node->field_job_name['und'][0]['value']][$node->field_node_id['und'][0]['value']] = drupal_get_path_alias('node/'.$ent_key);
-		}
-	}
-*/
-
 
 	//Set up render array 
 	$table = array(
 		'#theme' => 'table',
 		'#header' => array(t('Status'),t('Job Name'),t('Node'),t('Description'),t('Start Time'),t('Doc'),t('Info'),t('Chart')),
-//		'#header' => array(t('Job Name'),t('Node'),t('Description'),t('Doc'),t('Info'),t('Chart')),
 		'#rows' => array(),
 	);
 
 	//Query DB
-
-/*
-	foreach($form_state['values'] as $k => $v) {
-		if(!strstr($k,'orderby') && !strstr($k,'form_') && $k !== 'submit' && $k !== 'op' && $v !== '') {
-			$where[] = $k." LIKE '%".$v."%'";
-		}
-	}
-
-	oci8_db_set_active('CMDV');
-	$sql = "SELECT JOB_NAME,NODE_ID,DESCRIPTION,TABLE_ID FROM EMUSER.DEF_JOB";
-	$sql.= isset($where) ? " WHERE ".implode(' AND ',$where) : "";
-	$sql.= " ORDER BY ".$form_state['values']['orderby']." ASC";
-	$result = oci8_db_query($sql);
-*/
-
 	foreach($form_state['values'] as $k => $v) {
 		if(!(strstr($k,'cmji_') || strstr($k,'cmjp_')) || $v == '') {
 			continue;
