@@ -131,7 +131,7 @@ function controlm_view_job_list_form_submit ($form, &$form_state) {
 	$query = db_select('cm_job_info','cmji');
 	$query->leftJoin('cm_job_status','cmjs','cmji.cmji_jobname = cmjs.cmjs_job_name AND cmji.cmji_nodeid = cmjs.cmjs_cpu_id');
 	$query->leftJoin('cm_job_properties','cmjp','cmji.cmji_id = cmjp.cmjp_job_id');
-	$query->fields('cmji',array('cmji_jobname','cmji_nodeid','cmji_description','cmji_table_id'));
+	$query->fields('cmji',array('cmji_jobname','cmji_nodeid','cmji_description','cmji_table_id','cmji_id'));
 	$query->fields('cmjs',array('cmjs_status','cmjs_start_time'));
 	if(isset($where)) {
 		foreach($where as $k => $v) {
@@ -202,7 +202,7 @@ function controlm_view_job_list_form_submit ($form, &$form_state) {
 			t($record['cmji_description']),
 			t($record['cmjs_start_time']),
 			$doc,
-			t('<a href="/job-information?job_name='.$record['cmji_jobname'].'" target="_blank">Info</a>'),
+			t('<a href="/job-information?job_name='.$record['cmji_jobname'].'&jobid='.$record['cmji_id'].'" target="_blank">Info</a>'),
 			t('<a href="/job-runtime-chart?job_name='.$record['cmji_jobname'].'&node='.$record['cmji_nodeid'].'" target="_blank">Chart</a>'),
 		);
 	}
