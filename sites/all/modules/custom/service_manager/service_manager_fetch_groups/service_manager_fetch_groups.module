@@ -7,7 +7,7 @@ function service_manager_fetch_groups_menu () {
                 'description' => 'Configuration for Service Manager Fetch Assignment Groups module',
                 'page callback' => 'drupal_get_form',
                 'page arguments' => array('service_manager_fetch_groups_form'),
-                'access arguments' => array('access controlm administration'),
+                'access arguments' => array('access service_manager administration'),
                 'type' => MENU_LOCAL_TASK,
                 'weight' => 2,
         );

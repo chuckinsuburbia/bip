@@ -1,0 +1,8 @@
+name = Service Manager Build Store Distro List
+description = This module contains functions to build an email distribution list for one or several stores.
+core = 7.x
+package = "service_manager"
+configure = admin/config/services/service_manager/store_distro
+dependencies[] = service_manager_base
+
+version = "7.x-X.X"

@@ -1,0 +1,251 @@
+<?php
+
+function service_manager_store_distro_permission() {
+        return array(
+                'access service_manager store distro' => array( 'title' => t('Access content for the Service Manager Store Distro module'), ),
+        );
+}
+
+function service_manager_store_distro_menu () {
+        $items = array();
+	$items['admin/config/services/service_manager/store_distro'] = array(
+                'title' => 'Fetch Assignment Groups',
+                'description' => 'Configuration for Service Manager Fetch Assignment Groups module',
+                'page callback' => 'drupal_get_form',
+                'page arguments' => array('service_manager_store_distro_config_form'),
+                'access arguments' => array('access service_manager administration'),
+                'type' => MENU_LOCAL_TASK,
+                'weight' => 3,
+        );
+        $items['service_manager/store_distro'] = array(
+                'title' => 'Build Store Distribution List',
+                'page callback' => 'drupal_get_form',
+		'page arguments' => array('service_manager_store_distro_form'),
+                'access arguments' => array('access service_manager store distro'),
+                'type' => MENU_NORMAL_ITEM,
+        );
+        return $items;
+}
+function service_manager_store_distro_execute() {
+  return array('#markup' => '<p>' . t(_service_manager_get_groups()) . '</p>');
+}
+
+function service_manager_store_distro_config_form() {
+	$form['service_manager_store_distro_cron'] = array(
+                '#type' => 'checkbox',
+                '#title' => t('Run during Cron?'),
+                '#default_value' => variable_get('service_manager_store_distro_cron',1),
+                '#description' => t('Do we want to run the fetch periodically through cron?'),
+                '#required' => FALSE,
+        );
+        $form['service_manager_store_distro_interval'] = array(
+                '#type' => 'textfield',
+                '#title' => t('Cron Interval'),
+                '#default_value' => variable_get('service_manager_store_distro_interval',3600),
+                '#size' => 10,
+                '#maxlength' => 10,
+                '#description' => t('The number of seconds between Cron executions.'),
+                '#required' => TRUE,
+        );
+        return system_settings_form($form);
+}
+function service_manager_store_distro_config_form_validate ($form, &$form_state) {
+        if(!ctype_digit(strval($form_state['values']['service_manager_store_distro_interval']))) {
+                form_set_error('service_manager_store_distro_interval', t('Interval value must be an integer.'));
+        }
+        if($form_state['values']['service_manager_store_distro_interval'] <= 0) {
+                form_set_error('service_manager_store_distro_interval', t('Interval value must be greater than zero.'));
+        }
+}
+
+function service_manager_store_distro_form($form, &$form_state) {
+	$sc = variable_get('service_manager_config_wsdl_client_url', '');
+	$sc_user = variable_get('service_manager_username','');
+	$sc_pass = variable_get('service_manager_password','');
+
+	$form['ldap_lookups'] = array(
+		'#type' => 'value',
+		'#value' => array(
+			'mgr' => 'Store Manager',
+			'feadmin' => 'Front-End Manager',
+			'deptmgr' => 'Department Manager',
+			'rx' => 'Pharmacist',
+			'sitemgr' => 'Online Shopping Site Manager',
+			'sbux' => 'Starbucks',
+		),
+	);
+	$form['ldap'] = array(
+		'#type' => 'fieldset',
+		'#title' => t('Store Addresses'),
+		'#collapsible' => TRUE,
+		'#collapsed' => FALSE,
+	);
+	foreach($form['ldap_lookups']['#value'] as $k => $v) {
+		$form['ldap'][$k] = array(
+			'#type' => 'checkbox',
+			'#title' => t($v),
+		);
+	}
+
+	$form['sc_lookups'] = array(
+		'#type' => 'value',
+		'#value' => array(
+			'AnpDictrictManager' => 'District Manager',
+			'AnpDsa' => 'Store Support Director',
+			'AnpSpecialist' => 'Store Support Manager',
+			'AnpOeSpecialist' => 'OE Specialist',
+			'AnpAssetProtectionSpecialist' => 'Asset Protection Specialist',
+			'AnpMainteanceManager' => 'Maintenance Manager',
+			'AnpVpOperations' => 'Champion of Banner',
+			'RXDM' => 'Pharmacy DM',
+			'AnpMainteanceManager' => 'Food Safety Manager',
+			'AnpOEDir' => 'Operational Effectiveness Director',
+		),
+	);
+	$form['sc'] = array(
+		'#type' => 'fieldset',
+		'#title' => t('Corp Addresses'),
+		'#collapsible' => TRUE,
+		'#collapsed' => FALSE,
+	);
+	foreach($form['sc_lookups']['#value'] as $k => $v) {
+		$form['sc'][$k] = array(
+			'#type' => 'checkbox',
+			'#title' => t($v),
+		);
+	}
+
+        $client = new nusoap_client($sc, 'wsdl', false, false, false, false, 0, 600);
+        $err = $client->getError();
+        if ($err) {
+                $form['some_text']['#markup'] = '<h2>Constructor error</h2><pre>'.$err.'</pre>';
+		return($form);
+        }
+        $client->setCredentials($sc_user, $sc_pass);
+
+	//Get list of stores from SC
+        $query = '(SiteCategory="STORE"&closed="FALSE"&Location~=NULL&City~=NULL&State~=NULL)';
+        $keys = new soapval('keys','LocationKeysType',"","http://servicecenter.peregrine.com/PWS",false,array("query" => $query));
+        $instance = new soapval("instance","LocationInstanceType","","http://servicecenter.peregrine.com/PWS");
+        $model = new soapval("model", "LocationModelType",array($keys,$instance),null,"http://servicecenter.peregrine.com/PWS");
+        $RetrieveLocationListRequest = new soapval("RetrieveLocationListRequest","RetrieveLocationListRequestType",$model,"http://servicecenter.peregrine.com/PWS");
+        $result = $client->call('RetrieveLocationList',$RetrieveLocationListRequest->serialize('literal'),"http://servicecenter.peregrine.com/PWS");
+        if ($client->fault) {
+		$form['some_text']['#markup'] = "Client fault";
+                return($form);
+        } else {
+                $err = $client->getError();
+                if ($err) {
+			$form['some_text']['#markup'] = "Client error: ".$err;
+                        return($form);
+                }
+        }
+
+	$form['storelist'] = array(
+		'#type' => 'value',
+		'#value' => array(),
+	);
+	$form['storelist_visible'] = array(
+		'#type' => 'value',
+		'#value' => array(),
+	);
+	foreach($result['instance'] as $location) {
+		$form['storelist']['#value'][$location['Location']] = $location;
+		$form['storelist_visible']['#value'][$location['Location']] = $location['Location'].' - '.$location['City'].', '.$location['State'];
+	}
+	$form['store'] = array(
+		'#title' => t('Stores'),
+		'#type' => 'select',
+		'#multiple' => TRUE,
+		'#options' => $form['storelist_visible']['#value'],
+		'#size' => 5,
+	);
+
+	$form['submit'] = array(
+                '#value' => t('Submit'),
+                '#type' => 'submit',
+                '#submit' => array('service_manager_store_distro_form_submit'),
+        );
+	if(isset($form_state['storage']['results'])) {
+		$form['results'] = array(
+			'#type' => 'fieldset',
+			'#title' => t('Email Distribution List'),
+			'#collapsible' => TRUE,
+			'#collapsed' => FALSE,
+		);
+		$form['results']['text'] = $form_state['storage']['results'];
+	}
+
+	return($form);
+}
+
+function service_manager_store_distro_form_submit($form, &$form_state) {
+	$results = "";
+	$ous = array(
+		'dc=corp,dc=gaptea,dc=com',
+		'dc=store,dc=gaptea,dc=com',
+	);
+	$err = array();
+
+	if ($ldap_servers = ldap_servers_get_servers(NULL, 'enabled')) {
+		$ldap_server = current($ldap_servers);
+		
+		foreach($form_state['values']['ldap_lookups'] as $k => $v) {
+			if($form_state['input'][$k] == 1) {
+				$ldap_lookups[] = $k;
+			}
+		}
+		foreach($form_state['values']['sc_lookups'] as $k => $v) {
+			if($form_state['input'][$k] == 1) {
+				$sc_lookups[] = $k;
+			}
+		}
+
+		foreach($form_state['input']['store'] as $store) {
+			foreach($ldap_lookups as $lookup) {
+				$found = FALSE;
+				foreach($ous as $ou) {
+					if ($ldap_results = $ldap_server->search($ou, 'SAMAccountName='.$store.$lookup)) {
+//						$results .= "<pre>".print_r($ldap_results,TRUE)."</pre>";
+						if($ldap_results['count'] == 1 && isset($ldap_results[0]['mail'][0])) {
+							$mailto[] = $ldap_results[0]['mail'][0];
+							$found = TRUE;
+						}
+					}
+				}
+				if(!$found) $err[] = "Account not found for: ".$store.$lookup;
+			}
+			foreach($sc_lookups as $lookup) {
+				if(isset($form_state['values']['storelist'][$store][$lookup])) {
+					$name = trim($form_state['values']['storelist'][$store][$lookup]);
+					if(is_null($name) || $name == '') continue;
+					$found = FALSE;
+					foreach($ous as $ou) {
+						if ($ldap_results = $ldap_server->search($ou, 'SAMAccountName='.$name)) {
+//							$results .= "<pre>".print_r($ldap_results,TRUE)."</pre>";
+							if($ldap_results['count'] == 1 && isset($ldap_results[0]['mail'][0])) {
+								$mailto[] = $ldap_results[0]['mail'][0];
+								$found = TRUE;
+							}
+						}
+					}
+					if(!$found) $err[] = "Account not found for: ".$name." (".$store."/".$form_state['values']['sc_lookups'][$lookup].")";
+				}
+			}
+		}		
+	} else {
+		$results .= "ERROR: No LDAP server configured.";
+	}
+
+//	$results .= "<pre>".print_r($form_state,TRUE)."</pre>";
+
+	sort($mailto);
+	$results .= implode('; ',array_unique($mailto));
+
+	sort($err);
+	$results .= "<br /><br />".implode('<br />',array_unique($err));
+
+	$form_state['storage']['results']['#markup'] = $results;
+	$form_state['rebuild'] = TRUE;
+	return($results);
+}
