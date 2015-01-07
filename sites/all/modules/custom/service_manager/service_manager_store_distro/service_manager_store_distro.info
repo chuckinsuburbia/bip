@@ -4,5 +4,6 @@ core = 7.x
 package = "service_manager"
 configure = admin/config/services/service_manager/store_distro
 dependencies[] = service_manager_base
+dependencies[] = ldap_servers
 
 version = "7.x-X.X"
