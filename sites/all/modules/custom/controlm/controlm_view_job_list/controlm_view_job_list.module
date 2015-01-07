@@ -184,7 +184,7 @@ function controlm_view_job_list_form_submit ($form, &$form_state) {
 			$jd_result = $query->execute();
 			if (!empty($jd_result['node'])) {
 				$jobdoc_nids = array_keys($jd_result['node']);
-				$doc = "<a href='/".drupal_get_path_alias('node/'.$jobdoc_nids[0])."'>Doc</a>";
+				$doc = "<a href='/".drupal_get_path_alias('node/'.$jobdoc_nids[0])."' target='_blank'>Doc</a>";
 			}
 		}
 		
