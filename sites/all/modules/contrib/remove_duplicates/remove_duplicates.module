@@ -613,10 +613,17 @@ function _remove_duplicates_get_field_common_name($node_field_machine_name) {
   }
   else {
     // Custom field.
-    $field = $node_field_machine_name . '_value';
-    $table = 'field_data_' . $node_field_machine_name;
+    $field_info = field_info_field($node_field_machine_name);
 
-    if (!(db_table_exists($table) && db_field_exists($table, $field))) {
+    if (!empty($field_info['storage']['details']['sql']['FIELD_LOAD_CURRENT'])) {
+      $table = key($field_info['storage']['details']['sql']['FIELD_LOAD_CURRENT']);
+      $field = current($field_info['storage']['details']['sql']['FIELD_LOAD_CURRENT'][$table]);
+
+      if (!(db_table_exists($table) && db_field_exists($table, $field))) {
+        return NULL;
+      }
+    }
+    else {
       return NULL;
     }
   }
@@ -763,75 +770,79 @@ function _remove_duplicates_get_nodes($node_type_machine_name = NULL, $node_fiel
   }
   else {
     // For Custom Fields.
-    $field = $node_field_machine_name . '_value';
-    $table = 'field_data_' . $node_field_machine_name;
+    $field_info = field_info_field($node_field_machine_name);
 
-    if (db_table_exists($table) && db_field_exists($table, $field)) {
+    if (!empty($field_info['storage']['details']['sql']['FIELD_LOAD_CURRENT'])) {
+      $table = key($field_info['storage']['details']['sql']['FIELD_LOAD_CURRENT']);
+      $field = current($field_info['storage']['details']['sql']['FIELD_LOAD_CURRENT'][$table]);
 
-      // Sub Query pattern :
-      // @code
-      //  SELECT cf.{field} AS {field}, md5(cf.{field}) AS checksum,
-      //  COUNT( * ) AS duplicate
-      //  FROM node n
-      //  INNER JOIN {table} cf ON cf.bundle = {node_type_machine_name}
-      //  AND cf.entity_type = 'node' AND cf.entity_id = n.nid
-      //  WHERE (
-      //    n.type = {node_type_machine_name}
-      //  )
-      //  GROUP BY checksum
-      //  HAVING count( duplicate ) > 1
-      // @endcode
-      $sub_query = db_select('node', 'n');
-      $sub_query->addJoin('INNER', $table, 'cf', 'cf.bundle = :bundle AND cf.entity_type = :entity_type AND n.nid = cf.entity_id ', array(
-          ':bundle' => $node_type_machine_name,
-          ':entity_type' => 'node',
+      if (db_table_exists($table) && db_field_exists($table, $field)) {
+
+        // Sub Query pattern :
+        // @code
+        //  SELECT cf.{field} AS {field}, md5(cf.{field}) AS checksum,
+        //  COUNT( * ) AS duplicate
+        //  FROM node n
+        //  INNER JOIN {table} cf ON cf.bundle = {node_type_machine_name}
+        //  AND cf.entity_type = 'node' AND cf.entity_id = n.nid
+        //  WHERE (
+        //    n.type = {node_type_machine_name}
+        //  )
+        //  GROUP BY checksum
+        //  HAVING count( duplicate ) > 1
+        // @endcode
+        $sub_query = db_select('node', 'n');
+        $sub_query->addJoin('INNER', $table, 'cf', 'cf.bundle = :bundle AND cf.entity_type = :entity_type AND n.nid = cf.entity_id ', array(
+            ':bundle' => $node_type_machine_name,
+            ':entity_type' => 'node',
+          ));
+        $sub_query->condition('n.type', $node_type_machine_name, '=');
+        $sub_query->fields('cf', array($field));
+        $sub_query->addExpression('md5(cf.' . $field . ')', 'checksum');
+        $sub_query->addExpression('COUNT(*)', 'duplicate');
+        $sub_query->groupBy('checksum');
+        $sub_query->havingCondition('duplicate', 1, '>');
+
+        // Main Query pattern :
+        // @code
+        //  SELECT n.nid AS nid, n.uid AS uid, n.status AS status,
+        //  n.created AS created, n.changed AS changed, n.title AS title,
+        //  u.name AS name, cf.{field} AS {field}
+        //  FROM node n
+        //  INNER JOIN users u ON n.uid = u.uid
+        //  INNER JOIN {table} cf ON cf.bundle = {node_type_machine_name}
+        //  AND cf.entity_type = 'node' AND cf.entity_id = n.nid
+        //  INNER JOIN (
+        //    {sub_query}
+        //  ) nn ON md5(cf.{field}) = md5(nn.{field})
+        //  WHERE (
+        //    n.type = {node_type_machine_name}
+        //  )
+        //  ORDER BY {field} ASC
+        // @endcode
+        $main_query = db_select('node', 'n');
+        $main_query->fields('n', array(
+          'nid',
+          'uid',
+          'status',
+          'created',
+          'changed',
+          'title',
         ));
-      $sub_query->condition('n.type', $node_type_machine_name, '=');
-      $sub_query->fields('cf', array($field));
-      $sub_query->addExpression('md5(cf.' . $field . ')', 'checksum');
-      $sub_query->addExpression('COUNT(*)', 'duplicate');
-      $sub_query->groupBy('checksum');
-      $sub_query->havingCondition('duplicate', 1, '>');
+        $main_query->fields('u', array('name'));
+        $main_query->fields('cf', array($field));
+        $main_query->addJoin('INNER', $table, 'cf', 'cf.bundle = :bundle AND cf.entity_type = :entity_type AND n.nid = cf.entity_id ', array(
+            ':bundle' => $node_type_machine_name,
+            ':entity_type' => 'node',
+          ));
+        $main_query->join('users', 'u', 'n.uid = u.uid');
+        $main_query->join($sub_query, 'nn', 'md5(cf.' . $field . ') = md5(nn.' . $field . ')');
+        $main_query->condition('n.type', $node_type_machine_name, '=');
+        $main_query->orderBy($field, 'ASC');
 
-      // Main Query pattern :
-      // @code
-      //  SELECT n.nid AS nid, n.uid AS uid, n.status AS status,
-      //  n.created AS created, n.changed AS changed, n.title AS title,
-      //  u.name AS name, cf.{field} AS {field}
-      //  FROM node n
-      //  INNER JOIN users u ON n.uid = u.uid
-      //  INNER JOIN {table} cf ON cf.bundle = {node_type_machine_name}
-      //  AND cf.entity_type = 'node' AND cf.entity_id = n.nid
-      //  INNER JOIN (
-      //    {sub_query}
-      //  ) nn ON md5(cf.{field}) = md5(nn.{field})
-      //  WHERE (
-      //    n.type = {node_type_machine_name}
-      //  )
-      //  ORDER BY {field} ASC
-      // @endcode
-      $main_query = db_select('node', 'n');
-      $main_query->fields('n', array(
-        'nid',
-        'uid',
-        'status',
-        'created',
-        'changed',
-        'title',
-      ));
-      $main_query->fields('u', array('name'));
-      $main_query->fields('cf', array($field));
-      $main_query->addJoin('INNER', $table, 'cf', 'cf.bundle = :bundle AND cf.entity_type = :entity_type AND n.nid = cf.entity_id ', array(
-          ':bundle' => $node_type_machine_name,
-          ':entity_type' => 'node',
-        ));
-      $main_query->join('users', 'u', 'n.uid = u.uid');
-      $main_query->join($sub_query, 'nn', 'md5(cf.' . $field . ') = md5(nn.' . $field . ')');
-      $main_query->condition('n.type', $node_type_machine_name, '=');
-      $main_query->orderBy($field, 'ASC');
+        $records = $main_query->execute()->fetchall();
 
-      $records = $main_query->execute()->fetchall();
-
+      }
     }
   }
 
