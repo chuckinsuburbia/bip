@@ -1,11 +1,11 @@
 name = "ThemeKey Testing"
-description = "Just a fake module for testing ThemeKey plugins."
+description = "Just a fake module for testing ThemeKey's module plugins"
 core = 7.x
 package = Development
 
-; Information added by Drupal.org packaging script on 2015-02-03
-version = "7.x-3.3"
+; Information added by Drupal.org packaging script on 2014-05-14
+version = "7.x-3.2"
 core = "7.x"
 project = "themekey"
-datestamp = "1422966217"
+datestamp = "1400056438"
 

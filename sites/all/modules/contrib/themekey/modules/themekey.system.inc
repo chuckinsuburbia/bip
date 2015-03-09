@@ -385,12 +385,7 @@ function themekey_dummy2query_param($dummy) {
   $query_params = $_GET;
   unset($query_params['q']);
   foreach ($query_params as $key => $value) {
-    if (!empty($value) && is_scalar($value)) {
-      $filtered_params[] = $key . '=' . $value;
-    }
-    else {
-      $filtered_params[] = $key;
-    }
+    $filtered_params[] = $key . (!empty($value) ? '=' . $value : '');
   }
   return count($filtered_params) ? array_unique($filtered_params) : NULL;
 }
@@ -414,12 +409,7 @@ function themekey_dummy2query_param($dummy) {
 function themekey_dummy2cookie($dummy) {
   $filtered_cookies = array();
   foreach ($_COOKIE as $key => $value) {
-    if (!empty($value) && is_scalar($value)) {
-      $filtered_cookies[] = $key . '=' . $value;
-    }
-    else {
-      $filtered_cookies[] = $key;
-    }
+    $filtered_cookies[] = $key . (!empty($value) ? '=' . $value : '');
   }
   return count($filtered_cookies) ? array_unique($filtered_cookies) : NULL;
 }

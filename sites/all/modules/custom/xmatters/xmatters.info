@@ -1,0 +1,7 @@
+name = xMatters
+description = This module contains functions to interact with xMatters Integration Agent
+core = 7.x
+package = "xmatters"
+configure = admin/config/services/xmatters
+
+version = "7.x-X.X"

@@ -75,7 +75,14 @@ function _service_manager_get_groups() {
         $sc_user = variable_get('service_manager_username','');
         $sc_pass = variable_get('service_manager_password','');
 
-        $client = new nusoap_client($sc, 'wsdl', false, false, false, false, 0, 600);
+	$cache = new nusoap_wsdlcache('/tmp', 86400);
+        $wsdl = $cache->get($sc);
+        if(is_null($wsdl)) {
+                $wsdl = new wsdl($sc, '', '', '', '', 5);
+                $cache->put($wsdl);
+        }
+
+        $client = new nusoap_client($wsdl, 'wsdl', false, false, false, false, 0, 600);
         $err = $client->getError();
         if ($err) {
                 return('<h2>Constructor error</h2><pre>' . $err . '</pre>');

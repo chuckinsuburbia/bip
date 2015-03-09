@@ -1,0 +1,640 @@
+<?php
+
+function controlm_fetch_extract_schema() {
+	$schema['cm_job_info'] = array(
+		'collation' => 'bin',
+		'fields' => array(
+                        'cmji_id' => array(
+                                'type' => 'serial',
+				'size' => 'normal',
+                                'not null' => true,
+                        ),
+                        'cmji_table_id' => array(
+                                'type' => 'int',
+				'not null' => true,
+                        ),
+			'cmji_parent_folder' => array(
+				'type' => 'varchar',
+				'length' => 64,
+			),
+                        'cmji_jobname' => array(
+                                'type' => 'varchar',
+                                'length' => 64,
+				'not null' => true,
+                        ),
+			'cmji_memname' => array(
+				'type' => 'text',
+			),
+			'cmji_group' => array(
+				'type' => 'varchar',
+				'length' => 50,
+			),
+			'cmji_application' => array(
+				'type' => 'varchar',
+				'length' => 20,
+			),
+			'cmji_sub_application' => array(
+				'type' => 'varchar',
+				'length' => 64,
+			),
+			'cmji_tasktype' => array(
+				'type' => 'varchar',
+				'length' => 21,
+			),
+			'cmji_author' => array(
+				'type' => 'varchar',
+				'length' => 50,
+			),
+			'cmji_memlib' => array(
+				'type' => 'varchar',
+				'length' => 255,
+			),
+			'cmji_cmdline' => array(
+				'type' => 'text',
+			),
+			'cmji_override_path' => array(
+				'type' => 'text',
+			),
+			'cmji_nodeid' => array(
+				'type' => 'varchar',
+				'length' => 50,
+			),
+			'cmji_owner' => array(
+				'type' => 'varchar',
+				'length' => 30,
+			),
+			'cmji_run_as' => array(
+				'type' => 'varchar',
+				'length' => 30,
+			),
+			'cmji_maxrerun' => array(
+				'type' => 'int',
+			),
+			'cmji_timefrom' => array(
+				'type' => 'varchar',
+				'length' => 4,
+			),
+			'cmji_timeto' => array(
+				'type' => 'varchar',
+				'length' => 4,
+			),
+			'cmji_timezone' => array(
+				'type' => 'varchar',
+				'length' => 9,
+			),
+			'cmji_due_out' => array(
+				'type' => 'varchar',
+				'length' => 3,
+			),
+			'cmji_priority' => array(
+				'type' => 'varchar',
+				'length' => 2,
+			),
+			'cmji_critical' => array(
+				'type' => 'char',
+				'length' => 1,
+			),
+			'cmji_cyclic' => array(
+				'type' => 'char',
+				'length' => 1,
+			),
+			'cmji_confirm' => array(
+				'type' => 'char',
+				'length' => 1,
+			),
+			'cmji_autoarch' => array(
+				'type' => 'char',
+				'length' => 1,
+			),
+			'cmji_interval' => array(
+				'type' => 'varchar',
+				'length' => 6,
+			),
+			'cmji_overlib' => array(
+				'type' => 'varchar',
+				'length' => 255,
+			),
+			'cmji_maxwait' => array(
+				'type' => 'int',
+				'size' => 'small',
+			),
+			'cmji_description' => array(
+				'type' => 'text',
+			),
+			'cmji_docmem' => array(
+				'type' => 'varchar',
+				'length' => 30,
+			),
+			'cmji_doclib' => array(
+				'type' => 'varchar',
+				'length' => 255,
+			),
+			'cmji_days' => array(
+				'type' => 'varchar',
+				'length' => 160,
+			),
+			'cmji_days_and_or' => array(
+				'type' => 'char',
+				'length' => 3,
+			),
+			'cmji_weekdays' => array(
+				'type' => 'varchar',
+				'length' => 50,
+			),
+			'cmji_date' => array(
+				'type' => 'varchar',
+				'length' => 255,
+			),
+			'cmji_dayscal' => array(
+				'type' => 'varchar',
+				'length' => 12,
+			),
+			'cmji_weekscal' => array(
+				'type' => 'varchar',
+				'length' => 10,
+			),
+			'cmji_confcal' => array(
+				'type' => 'varchar',
+				'length' => 10,
+			),
+			'cmji_retro' => array(
+				'type' => 'char',
+				'length' => 1,
+			),
+			'cmji_shift' => array(
+				'type' => 'varchar',
+				'length' => 10,
+			),
+			'cmji_shiftnum' => array(
+				'type' => 'char',
+				'length' => 3,
+			),
+			'cmji_maxdays' => array(
+				'type' => 'int',
+				'size' => 'small',
+			),
+			'cmji_maxruns' => array(
+				'type' => 'int',
+				'size' => 'small',
+			),
+			'cmji_rerunmem' => array(
+				'type' => 'varchar',
+				'length' => 8,
+			),
+			'cmji_reten_days' => array(
+				'type' => 'varchar',
+				'length' => 100,
+			),
+			'cmji_reten_gen' => array(
+				'type' => 'char',
+				'length' => 3,
+			),
+			'cmji_task_class' => array(
+				'type' => 'char',
+				'length' => 3,
+			),
+			'cmji_prev_day' => array(
+				'type' => 'char',
+				'length' => 1,
+			),
+			'cmji_ind_cyclic' => array(
+				'type' => 'varchar',
+				'length' => 6,
+			),
+			'cmji_cyclic_type' => array(
+				'type' => 'varchar',
+				'length' => 20,
+			),
+			'cmji_cyclic_times_sequence' => array(
+				'type' => 'text',
+			),
+			'cmji_cyclic_tolerance' => array(
+				'type' => 'char',
+				'length' => 4,
+			),
+			'cmji_cyclic_interval_sequence' => array(
+				'type' => 'char',
+				'length' => 4,
+			),
+			'cmji_tag_relationship' => array(
+				'type' => 'char',
+				'length' => 1,
+			),
+			'cmji_sysdb' => array(
+				'type' => 'char',
+				'length' => 1,
+			),
+			'cmji_pdsname' => array(
+				'type' => 'varchar',
+				'length' => 44,
+			),
+			'cmji_minimum' => array(
+				'type' => 'char',
+				'length' => 3,
+			),
+			'cmji_category' => array(
+				'type' => 'varchar',
+				'length' => 20,
+			),
+			'cmji_preventnct2' => array(
+				'type' => 'char',
+				'length' => 1,
+			),
+			'cmji_jan' => array(
+				'type' => 'char',
+				'length' => 1,
+			),
+			'cmji_feb' => array(
+				'type' => 'char',
+				'length' => 1,
+			),
+			'cmji_mar' => array(
+				'type' => 'char',
+				'length' => 1,
+			),
+			'cmji_apr' => array(
+				'type' => 'char',
+				'length' => 1,
+			),
+			'cmji_may' => array(
+				'type' => 'char',
+				'length' => 1,
+			),
+			'cmji_jun' => array(
+				'type' => 'char',
+				'length' => 1,
+			),
+			'cmji_jul' => array(
+				'type' => 'char',
+				'length' => 1,
+			),
+			'cmji_aug' => array(
+				'type' => 'char',
+				'length' => 1,
+			),
+			'cmji_sep' => array(
+				'type' => 'char',
+				'length' => 1,
+			),
+			'cmji_oct' => array(
+				'type' => 'char',
+				'length' => 1,
+			),
+			'cmji_nov' => array(
+				'type' => 'char',
+				'length' => 1,
+			),
+			'cmji_dec' => array(
+				'type' => 'char',
+				'length' => 1,
+			),
+			'cmji_option' => array(
+				'type' => 'varchar',
+				'length' => 16,
+			),
+			'cmji_par' => array(
+				'type' => 'varchar',
+				'length' => 55,
+			),
+			'cmji_from' => array(
+				'type' => 'char',
+				'length' => 1,
+			),
+			'cmji_adjust_cond' => array(
+				'type' => 'char',
+				'length' => 1,
+			),
+			'cmji_jobs_in_group' => array(
+				'type' => 'char',
+				'length' => 5,
+			),
+			'cmji_large_size' => array(
+				'type' => 'varchar',
+				'length' => 6,
+			),
+			'cmji_creation_user' => array(
+				'type' => 'varchar',
+				'length' => 8,
+			),
+			'cmji_created_by' => array(
+				'type' => 'varchar',
+				'length' => 8,
+			),
+			'cmji_creation_date' => array(
+				'type' => 'varchar',
+				'length' => 8,
+			),
+			'cmji_creation_time' => array(
+				'type' => 'varchar',
+				'length' => 8,
+			),
+			'cmji_change_userid' => array(
+				'type' => 'varchar',
+				'length' => 8,
+			),
+			'cmji_change_date' => array(
+				'type' => 'varchar',
+				'length' => 8,
+			),
+			'cmji_change_time' => array(
+				'type' => 'varchar',
+				'length' => 8,
+			),
+			'cmji_job_release' => array(
+				'type' => 'varchar',
+				'length' => 10,
+			),
+			'cmji_job_version' => array(
+				'type' => 'varchar',
+				'length' => 5,
+			),
+			'cmji_jobisn' => array(
+				'type' => 'varchar',
+				'length' => 10,
+			),
+			'cmji_appl_type' => array(
+				'type' => 'varchar',
+				'length' => 10,
+			),
+			'cmji_appl_ver' => array(
+				'type' => 'varchar',
+				'length' => 10,
+			),
+			'cmji_appl_form' => array(
+				'type' => 'varchar',
+				'length' => 30,
+			),
+			'cmji_cm_ver' => array(
+				'type' => 'varchar',
+				'length' => 10,
+			),
+			'cmji_multy_agent' => array(
+				'type' => 'char',
+				'length' => 1,
+			),
+			'cmji_active_from' => array(
+				'type' => 'varchar',
+				'length' => 8,
+			),
+			'cmji_active_till' => array(
+				'type' => 'varchar',
+				'length' => 8,
+			),
+			'cmji_scheduling_environment' => array(
+				'type' => 'varchar',
+				'length' => 16,
+			),
+			'cmji_system_affinity' => array(
+				'type' => 'varchar',
+				'length' => 4,
+			),
+			'cmji_request_nje_node' => array(
+				'type' => 'varchar',
+				'length' => 8,
+			),
+			'cmji_use_instream_jcl' => array(
+				'type' => 'char',
+				'length' => 1,
+			),
+			'cmji_rule_based_calendar_relationship' => array(
+				'type' => 'char',
+				'length' => 1,
+			),
+		),
+		'primary key' => array('cmji_id'),
+		'indexes' => array(
+			'cmji_idx' => array(
+				'cmji_jobname',
+				'cmji_nodeid',
+			),
+			'idx_cmji_table_id' => array('cmji_table_id'),
+		),
+	);
+	$schema['cm_job_on_properties'] = array(
+		'collation' => 'bin',
+		'fields' => array(
+			'cmjop_id' => array(
+                                'type' => 'serial',
+				'size' => 'normal',
+                                'not null' => true,
+			),
+			'cmjop_job_id' => array(
+                                'type' => 'int',
+                                'not null' => true,
+			),
+			'cmjop_prop_type' => array(
+                                'type' => 'int',
+                                'not null' => true,
+			),
+			'cmjop_on_type' => array(
+                                'type' => 'int',
+                                'not null' => true,
+			),
+			'cmjop_value' => array(
+                                'type' => 'varchar',
+				'length' => 2048,
+			),
+			'cmjop_num' => array(
+                                'type' => 'int',
+			),
+			'cmjop_subnum' => array(
+                                'type' => 'int',
+			),
+		),
+		'primary key' => array('cmjop_id'),
+		'indexes' => array(
+			'idx_cmjop_job_id' => array('cmjop_job_id'),
+			'idx_cmjop_prop_type' => array('cmjop_prop_type'),
+			'idx_cmjop_value' => array('cmjop_value'),
+		),
+	);
+	$schema['cm_job_properties'] = array(
+		'collation' => 'bin',
+		'fields' => array(
+			'cmjp_id' => array(
+                                'type' => 'serial',
+				'size' => 'normal',
+                                'not null' => true,
+			),
+			'cmjp_job_id' => array(
+                                'type' => 'int',
+                                'not null' => true,
+			),
+			'cmjp_type' => array(
+                                'type' => 'int',
+                                'not null' => true,
+			),
+			'cmjp_value' => array(
+                                'type' => 'varchar',
+                                'length' => 255,
+			),
+			'cmjp_num' => array(
+                                'type' => 'int',
+			),
+		),
+		'primary key' => array('cmjp_id'),
+		'indexes' => array(
+			'idx_cmjp_job_id' => array('cmjp_job_id'),
+			'idx_cmjp_type' => array('cmjp_type'),
+			'idx_cmjp_value' => array('cmjp_value'),
+		),
+	);
+	$schema['cm_on_types'] = array(
+		'collation' => 'bin',
+		'fields' => array(
+			'cmot_id' => array(
+                                'type' => 'serial',
+				'size' => 'normal',
+                                'not null' => true,
+			),
+			'cmot_type_name' => array(
+                                'type' => 'varchar',
+				'length' => 100,
+                                'not null' => true,
+			),
+			'cmot_var' => array(
+                                'type' => 'varchar',
+				'length' => 50,
+			),
+		),
+		'primary key' => array('cmot_id'),
+		'indexes' => array(
+			'idx_cmot_type_name' => array('cmot_type_name'),
+			'idx_cmot_var' => array('cmot_var'),
+			'idx_type_var' => array('cmot_type_name','cmot_var'),
+		),
+	);
+	$schema['cm_prop_types'] = array(
+		'collation' => 'bin',
+		'fields' => array(
+			'cmpt_id' => array(
+                                'type' => 'serial',
+				'size' => 'normal',
+                                'not null' => true,
+			),
+			'cmpt_type_name' => array(
+                                'type' => 'varchar',
+				'length' => 100,
+                                'not null' => true,
+			),
+			'cmpt_var' => array(
+                                'type' => 'varchar',
+				'length' => 50,
+			),
+		),
+		'primary key' => array('cmpt_id'),
+		'indexes' => array(
+			'idx_cmpt_type_name' => array('cmpt_type_name'),
+			'idx_cmpt_var' => array('cmpt_var'),
+			'idx_type_var' => array('cmpt_type_name','cmpt_var'),
+		),
+	);
+	$schema['cm_sched_table'] = array(
+		'collation' => 'bin',
+		'fields' => array(
+			'cmt_id' => array(
+                                'type' => 'serial',
+				'size' => 'normal',
+                                'not null' => true,
+			),
+			'cmt_datacenter' => array(
+                                'type' => 'varchar',
+				'length' => 20,
+                                'not null' => true,
+				'binary' => true,
+			),
+/*
+			'cmt_table_name' => array(
+                                'type' => 'varchar',
+				'length' => 50,
+                                'not null' => true,
+			),
+*/
+			'cmt_folder_name' => array(
+                                'type' => 'varchar',
+				'length' => 50,
+                                'not null' => true,
+				'binary' => true,
+			),
+/*
+			'cmt_table_dsn' => array(
+                                'type' => 'varchar',
+				'length' => 44,
+			),
+*/
+/*
+			'cmt_table_userdaily' => array(
+                                'type' => 'varchar',
+				'length' => 10,
+			),
+*/
+/*
+			'cmt_used_by' => array(
+                                'type' => 'varchar',
+				'length' => 40,
+			),
+*/
+			'cmt_used_by_code' => array(
+                                'type' => 'int',
+			),
+/*
+			'cmt_modified' => array(
+                                'type' => 'char',
+				'length' => 1,
+			),
+*/
+                        'cmt_last_upload' => array(
+                                'type' => 'datetime',
+				'mysql_type' => 'datetime',
+				'pgsql_type' => 'timestamp',
+                                'not null' => true,
+                        ),
+/*
+			'cmt_checksum' => array(
+                                'type' => 'varchar',
+				'length' => 40,
+			),
+*/
+/*
+			'cmt_table_id' => array(
+                                'type' => 'int',
+			),
+*/
+/*
+			'cmt_real_tableid' => array(
+                                'type' => 'int',
+			),
+*/
+			'cmt_real_folder_id' => array(
+                                'type' => 'int',
+			),
+			'cmt_platform' => array(
+                                'type' => 'varchar',
+				'length' => 10,
+			),
+			'cmt_type' => array(
+                                'type' => 'int',
+			),
+			'cmt_version' => array(
+                                'type' => 'int',
+			),
+			'cmt_folder_order_method' => array(
+				'type' => 'varchar',
+				'length' => 64,
+			),
+		),
+		'primary key' => array('cmt_id'),
+		'unique keys' => array(
+//			'idx_cmt_unq' => array('cmt_datacenter','cmt_table_name'),
+			'idx_cmt_unq' => array('cmt_datacenter','cmt_folder_name'),
+		),
+	);
+
+
+
+        return($schema);
+}
+
+function controlm_fetch_extract_enable() {
+	echo('');
+}

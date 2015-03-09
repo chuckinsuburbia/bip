@@ -1,0 +1,275 @@
+<?php
+
+function controlm_base_schema() {
+        $schema['cm_jobs_run'] = array(
+		'collation' => 'bin',
+                'fields' => array(
+                        'cmjr_id' => array(
+                                'type' => 'serial',
+				'size' => 'big',
+                                'not null' => true,
+                        ),
+                        'cmjr_timestamp' => array(
+                                'type' => 'datetime',
+				'mysql_type' => 'datetime',
+				'pgsql_type' => 'timestamp',
+				'not null' => true,
+                        ),
+                        'cmjr_job_name' => array(
+                                'type' => 'varchar',
+                                'length' => 64,
+				'not null' => true,
+                        ),
+                        'cmjr_order_id' => array(
+                                'type' => 'varchar',
+                                'length' => 8,
+				'not null' => true,
+                        ),
+                        'cmjr_run' => array(
+                                'type' => 'int',
+				'not null' => true,
+                        ),
+                        'cmjr_node_id' => array(
+                                'type' => 'varchar',
+                                'length' => 50,
+				'not null' => true,
+                        ),
+                        'cmjr_mem_name' => array(
+                                'type' => 'varchar',
+                                'length' => 30,
+				'not null' => true,
+                        ),
+                        'cmjr_mem_lib' => array(
+                                'type' => 'varchar',
+                                'length' => 50,
+                        ),
+                        'cmjr_cpu' => array(
+                                'type' => 'numeric',
+				'size' => 'normal',
+				'precision' => 10,
+				'scale' => 0,
+				'not null' => true,
+                        ),
+                        'cmjr_elapsed_time' => array(
+                                'type' => 'numeric',
+				'size' => 'normal',
+				'precision' => 10,
+				'scale' => 0,
+				'not null' => true,
+                        ),
+                        'cmjr_create_timestamp' => array(
+                                'type' => 'timestamp',
+				'mysql_type' => 'timestamp',
+				'pgsql_type' => 'timestamp',
+				'not null' => true,
+                        ),
+                ),
+                'primary key' => array('cmjr_id'),
+		'unique keys' => array(
+			'UN_CMJR_IDX' => array(
+				'cmjr_order_id',
+				'cmjr_job_name',
+				'cmjr_node_id',
+				'cmjr_run',
+				'cmjr_timestamp',
+			),
+		),
+		'indexes' => array(
+			'idx_cmjr_job_name' => array('cmjr_job_name'),
+			'idx_cmjr_node_id' => array('cmjr_node_id'),
+			'idx_cmjr_timestamp' => array('cmjr_timestamp'),
+		),
+        );
+	$schema['cm_job_average'] = array(
+		'collation' => 'bin',
+		'fields' => array(
+                        'cmja_job_name' => array(
+                                'type' => 'varchar',
+                                'length' => 64,
+				'not null' => true,
+                        ),
+                        'cmja_node_id' => array(
+                                'type' => 'varchar',
+                                'length' => 50,
+				'not null' => true,
+                        ),
+                        'cmja_dow' => array(
+                                'type' => 'int',
+				'not null' => true,
+                        ),
+                        'cmja_average' => array(
+                                'type' => 'numeric',
+				'size' => 'normal',
+				'precision' => 14,
+				'scale' => 4,
+                        ),
+                        'cmja_min' => array(
+                                'type' => 'numeric',
+				'size' => 'normal',
+				'precision' => 10,
+				'scale' => 0,
+                        ),
+                        'cmja_max' => array(
+                                'type' => 'numeric',
+				'size' => 'normal',
+				'precision' => 10,
+				'scale' => 0,
+                        ),
+		),
+		'primary key' => array(
+			'cmja_job_name',
+			'cmja_node_id',
+			'cmja_dow',
+		),
+	);
+	$schema['cm_job_status'] = array(
+		'collation' => 'bin',
+		'fields' => array(
+			'cmjs_id' => array(
+                                'type' => 'serial',
+				'size' => 'normal',
+                                'not null' => true,
+			),
+			'cmjs_order_id' => array(
+                                'type' => 'char',
+				'length' => 5,
+                                'not null' => true,
+			),
+			'cmjs_application' => array(
+                                'type' => 'varchar',
+				'length' => 20,
+                                'not null' => true,
+			),
+			'cmjs_group_name' => array(
+                                'type' => 'varchar',
+				'length' => 50,
+                                'not null' => true,
+			),
+			'cmjs_memname' => array(
+                                'type' => 'varchar',
+				'length' => 30,
+			),
+			'cmjs_job_name' => array(
+                                'type' => 'varchar',
+				'length' => 64,
+                                'not null' => true,
+			),
+			'cmjs_odate' => array(
+                                'type' => 'varchar',
+				'length' => 6,
+                                'not null' => true,
+			),
+			'cmjs_cpu_id' => array(
+                                'type' => 'varchar',
+				'length' => 20,
+			),
+			'cmjs_node_id' => array(
+                                'type' => 'varchar',
+				'length' => 50,
+			),
+			'cmjs_status' => array(
+                                'type' => 'varchar',
+				'length' => 16,
+                                'not null' => true,
+			),
+			'cmjs_state' => array(
+                                'type' => 'varchar',
+				'length' => 40,
+			),
+			'cmjs_delete_flag' => array(
+                                'type' => 'char',
+				'length' => 1,
+			),
+                        'cmjs_start_time' => array(
+                                'type' => 'datetime',
+				'mysql_type' => 'datetime',
+				'pgsql_type' => 'timestamp',
+                        ),
+                        'cmjs_end_time' => array(
+                                'type' => 'datetime',
+				'mysql_type' => 'datetime',
+				'pgsql_type' => 'timestamp',
+                        ),
+		),
+		'primary key' => array('cmjs_id'),
+		'indexes' => array(
+			'idx_cmjs_job_name' => array('cmjs_job_name'),
+			'idx_cmjs_status' => array('cmjs_status'),
+			'idx_cmjs_order_id' => array('cmjs_order_id'),
+			'idx_job_status' => array('cmjs_job_name','cmjs_status'),
+		),
+	);
+	$schema['cm_job_trend'] = array(
+		'collation' => 'bin',
+		'fields' => array(
+			'cmjt_id' => array(
+                                'type' => 'serial',
+				'size' => 'normal',
+                                'not null' => true,
+			),
+			'cmjt_job_name' => array(
+                                'type' => 'varchar',
+				'length' => 64,
+                                'not null' => true,
+			),
+			'cmjt_node_id' => array(
+                                'type' => 'varchar',
+				'length' => 20,
+                                'not null' => true,
+			),
+                        'cmjt_trend' => array(
+                                'type' => 'numeric',
+				'size' => 'normal',
+				'precision' => 10,
+				'scale' => 0,
+                                'not null' => true,
+                        ),
+                        'cmjt_last_run' => array(
+                                'type' => 'datetime',
+				'mysql_type' => 'datetime',
+				'pgsql_type' => 'timestamp',
+                                'not null' => true,
+                        ),
+                        'cmjt_last_time' => array(
+                                'type' => 'numeric',
+				'size' => 'normal',
+				'precision' => 10,
+				'scale' => 0,
+                        ),
+			'cmjt_alarm' => array(
+                                'type' => 'varchar',
+				'length' => 10,
+			),
+                        'cmjt_update_datetime' => array(
+                                'type' => 'datetime',
+				'mysql_type' => 'datetime',
+				'pgsql_type' => 'timestamp',
+                                'not null' => true,
+                        ),
+		),
+		'primary key' => array('cmjt_id'),
+		'indexes' => array(
+			'idx_cmjt_job_name' => array('cmjt_job_name'),
+			'idx_cmjt_trend' => array('cmjt_trend'),
+			'idx_cmjt_last_run' => array('cmjt_last_run'),
+			'idx_job_node' => array('cmjt_job_name','cmjt_node_id'),
+		),
+	);
+
+        return($schema);
+}
+
+function controlm_base_enable() {
+	db_query('
+		ALTER TABLE {cm_jobs_run} 
+		MODIFY cmjr_create_timestamp TIMESTAMP NOT NULL 
+		DEFAULT CURRENT_TIMESTAMP 
+		ON UPDATE CURRENT_TIMESTAMP'
+	);
+	db_query('
+		ALTER TABLE {cm_job_trend} 
+		MODIFY cmjt_update_datetime TIMESTAMP NOT NULL 
+		DEFAULT CURRENT_TIMESTAMP 
+		ON UPDATE CURRENT_TIMESTAMP'
+	);
+}

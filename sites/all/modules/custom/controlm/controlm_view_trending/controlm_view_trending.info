@@ -1,0 +1,7 @@
+name = Control-M View Trending
+description = This module contains code to view the list of jobs with runtimes trending up or down
+core = 7.x
+package = "control-m"
+dependencies[] = controlm_calc_trending
+
+version = "7.x-X.X"

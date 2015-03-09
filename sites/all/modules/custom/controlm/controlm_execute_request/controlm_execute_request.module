@@ -49,14 +49,27 @@ function controlm_execute_request_page() {
 
 	$markup = "";
 
-	$markup .= '<code><div id="ajax-target-command-status"></div></code>';
-	$markup .= '<div id="ajax-target-job-list">Please wait one moment...</div>';
-	$markup .= '<script>function controlm_execute_request_list_jobs_ajax_load() { jQuery("#ajax-target-job-list").load("/ajax/controlm/execute_request/pleasewait"); jQuery("#ajax-target-job-list").load("/ajax/controlm/execute_request/list_jobs"); } ';
-	$markup .= 'function controlm_execute_request_ctmwhy_ajax_load(jobname,orderid) { jQuery("#ajax-target-command-status").load("/ajax/controlm/execute_request/ctmwhy/" + jobname + "/" + orderid); } ';
-	$markup .= 'function controlm_execute_request_freejob_ajax_load(jobname,orderid) { jQuery("#ajax-target-command-status").load("/ajax/controlm/execute_request/freejob/" + jobname + "/" + orderid); } ';
-	$markup .= 'function controlm_execute_request_confirmjob_ajax_load(jobname,orderid) { jQuery("#ajax-target-command-status").load("/ajax/controlm/execute_request/confirmjob/" + jobname + "/" + orderid); } ';
-	$markup .= 'function scrollToTop() { jQuery("html, body").animate({ scrollTop: 0 }, "fast"); } ';
-	$markup .= 'jQuery(document).ready(function($){controlm_execute_request_list_jobs_ajax_load();});</script>';
+	$markup .= <<<EOM
+<code><div id="ajax-target-command-status"></div></code>
+<div id="ajax-target-job-list">Please wait one moment...</div>
+<script>
+	function controlm_execute_request_list_jobs_ajax_load() { 
+		jQuery("#ajax-target-job-list").load("/ajax/controlm/execute_request/pleasewait"); 
+		jQuery("#ajax-target-job-list").load("/ajax/controlm/execute_request/list_jobs"); 
+	}
+	function controlm_execute_request_ctmwhy_ajax_load(jobname,orderid) { 
+		jQuery("#ajax-target-command-status").load("/ajax/controlm/execute_request/ctmwhy/" + jobname + "/" + orderid); 
+	}
+	function controlm_execute_request_freejob_ajax_load(jobname,orderid) { 
+		jQuery("#ajax-target-command-status").load("/ajax/controlm/execute_request/freejob/" + jobname + "/" + orderid); 
+	}
+	function controlm_execute_request_confirmjob_ajax_load(jobname,orderid) { 
+		jQuery("#ajax-target-command-status").load("/ajax/controlm/execute_request/confirmjob/" + jobname + "/" + orderid); 
+	}
+	function scrollToTop() { jQuery("html, body").animate({ scrollTop: 0 }, "fast"); }
+	jQuery(document).ready(function($){controlm_execute_request_list_jobs_ajax_load();});
+</script>
+EOM;
 
 	return(array('#markup' => t($markup)));
 }
@@ -122,7 +135,7 @@ function controlm_execute_request_list_jobs_get_ajax() {
 		$return .= "<h3>".$groupname."</h3>";
 		$table = array(
 			'#theme' => 'table',
-			'#header' => array(t('Job Name'),t('Node'),t('Order Date'),t('Status'),t('State'),t('Command Line'),t('Doc'),t('Info'),''),
+			'#header' => array(t('Job Name'),t('Node'),t('Order Date'),t('Status'),t('State'),t('Command Line'),t('Doc'),''),
 			'#rows' => array(),
 		);
 		foreach($jobs as $jobname => $jobprop) {
@@ -134,7 +147,6 @@ function controlm_execute_request_list_jobs_get_ajax() {
 				t($jobprop['status']['CMJS_STATE']),
 				array('data' => t($jobprop['jobdoc']->field_command_line['und'][0]['value']),'style' => 'word-break:break-all;'),
 				t("<a href='/".drupal_get_path_alias('node/'.$jobprop['jobdoc']->nid)."'>Doc</a>"),
-				t('<a href="/job-information?job_name='.$jobprop['status']['CMJS_JOB_NAME'].'" target="_blank">Info</a>'),
 				t('<a href="#" onclick="controlm_execute_request_ctmwhy_ajax_load(\''.$jobprop['status']['CMJS_JOB_NAME'].'\',\''.$jobprop['status']['CMJS_ORDER_ID'].'\');scrollToTop();">Why</a>'),
 			);
 		}
@@ -152,20 +164,26 @@ function controlm_execute_request_ctmwhy_get_ajax($jobname = '',$orderid = '') {
 	if($orderid == '') return;
 	$return = $jobname."<br />";
 
-	$client = new nusoap_client(variable_get('controlm_wsdl_client_url', ''), 'wsdl', false, false, false, false, 0, 600);
-	$err = $client->getError();
-	if ($err) {
-		return 'Constructor error<pre>'.$err.'</pre>';
-	}
-	$proxy = $client->getProxy();
+	$hostname = variable_get('controlm_hostname', '');
+	$username = variable_get('controlm_username', '');
+	$identity = variable_get('controlm_identity_file', '');
+	$known_hosts = variable_get('controlm_known_hosts_file', '');
 
-	$result = $proxy->ws_ctmWhy($orderid);
-	$return .= implode("<br />",$result)."<br />";
+	$cmd = 'ssh -i '.$identity.' -o UserKnownHostsFile='.$known_hosts.' '.$username.'@'.$hostname.' "ctmwhy '.$orderid.'"';
+	exec($cmd,$output,$rc);
+//	$return .= "<pre>".print_r($output,TRUE)."</pre>";
+	if($rc !== 0) {
+		drupal_set_message('Command returned error '.$rc.': '.$cmd,'error');
+		dsm($output);
+		return;
+	}
+
+	$return .= implode("<br />",$output)."<br />";
 	$return .= t('<a href="#" onclick="controlm_execute_request_ctmwhy_ajax_load(\''.$jobname.'\',\''.$orderid.'\');scrollToTop();">Reload Why</a><br />');
-	if(in_array('Job is waiting for confirmation.',$result)) {
+	if(in_array('Job is waiting for confirmation.',$output)) {
 		$return .= t('<a href="#" onclick="controlm_execute_request_confirmjob_ajax_load(\''.$jobname.'\',\''.$orderid.'\');scrollToTop();">Confirm Job</a><br />');
 	}
-	if(in_array("Job is held.", $result)) {
+	if(in_array("Job is held.", $output)) {
 		$return .= t('<a href="#" onclick="controlm_execute_request_freejob_ajax_load(\''.$jobname.'\',\''.$orderid.'\');scrollToTop();">Free Job</a>');
 	}
 
@@ -179,15 +197,21 @@ function controlm_execute_request_confirmjob_get_ajax($jobname = '',$orderid = '
 	if($orderid == '') return;
 	$return = "";
 
-	$client = new nusoap_client(variable_get('controlm_wsdl_client_url', ''), 'wsdl', false, false, false, false, 0, 600);
-	$err = $client->getError();
-	if ($err) {
-		return 'Constructor error<pre>'.$err.'</pre>';
-	}
-	$proxy = $client->getProxy();
+	$hostname = variable_get('controlm_hostname', '');
+	$username = variable_get('controlm_username', '');
+	$identity = variable_get('controlm_identity_file', '');
+	$known_hosts = variable_get('controlm_known_hosts_file', '');
 
-	$result = $proxy->confirmJob($orderid);
-	$return .= implode("<br />",$result)."<br />";
+	$cmd = 'ssh -i '.$identity.' -o UserKnownHostsFile='.$known_hosts.' '.$username.'@'.$hostname.' "ctmpsm -UPDATEAJF '.$orderid.' CONFIRM"';
+	exec($cmd,$output,$rc);
+//	$return .= "<pre>".print_r($output,TRUE)."</pre>";
+	if($rc !== 0) {
+		drupal_set_message('Command returned error '.$rc.': '.$cmd,'error');
+		dsm($output);
+		return;
+	}
+
+	$return .= implode("<br />",$output)."<br />";
 	$return .= t('<a href="#" onclick="controlm_execute_request_ctmwhy_ajax_load(\''.$jobname.'\',\''.$orderid.'\');scrollToTop();">Why</a><br />');
 
 	return $return;
@@ -200,15 +224,21 @@ function controlm_execute_request_freejob_get_ajax($jobname = '',$orderid = '') 
 	if($orderid == '') return;
 	$return = "";
 
-	$client = new nusoap_client(variable_get('controlm_wsdl_client_url', ''), 'wsdl', false, false, false, false, 0, 600);
-	$err = $client->getError();
-	if ($err) {
-		return 'Constructor error<pre>'.$err.'</pre>';
-	}
-	$proxy = $client->getProxy();
+	$hostname = variable_get('controlm_hostname', '');
+	$username = variable_get('controlm_username', '');
+	$identity = variable_get('controlm_identity_file', '');
+	$known_hosts = variable_get('controlm_known_hosts_file', '');
 
-	$result = $proxy->freeJob($orderid);
-	$return .= implode("<br />",$result)."<br />";
+	$cmd = 'ssh -i '.$identity.' -o UserKnownHostsFile='.$known_hosts.' '.$username.'@'.$hostname.' "ctmpsm -UPDATEAJF '.$orderid.' FREE"';
+	exec($cmd,$output,$rc);
+//	$return .= "<pre>".print_r($output,TRUE)."</pre>";
+	if($rc !== 0) {
+		drupal_set_message('Command returned error '.$rc.': '.$cmd,'error');
+		dsm($output);
+		return;
+	}
+
+	$return .= implode("<br />",$output)."<br />";
 	$return .= t('<a href="#" onclick="controlm_execute_request_ctmwhy_ajax_load(\''.$jobname.'\',\''.$orderid.'\');scrollToTop();">Why</a><br />');
 
 	return $return;

@@ -1,0 +1,35 @@
+<?php
+
+function controlm_view_trending_menu () {
+	$items = array();
+	$items['controlm/view_trending'] = array(
+		'title' => 'View Trending',
+		'page callback' => 'controlm_view_trending_execute',
+		'access arguments' => array('access controlm content'),
+		'type' => MENU_NORMAL_ITEM,
+	);
+	return $items;
+}
+function controlm_view_trending_execute() {
+	$markup = "";
+
+	db_set_active('bip');
+
+	$query = db_select('cm_job_trend','cjt');
+	$query->leftJoin('cm_job_average','cja','cjt.cmjt_job_name = cja.cmja_job_name AND cjt.cmjt_node_id = cja.cmja_node_id');
+	$query->fields('cjt')->addField('cja','CMJA_AVERAGE');
+	$query->condition('cmjt_alarm','','<>');
+	$query->where('DATE_SUB(CURDATE(),INTERVAL 60 DAY) <= cmjt_last_run');
+	$query->condition('cmja_dow',date('N'),'=');
+	$query->orderBy('cmjt_alarm','ASC')->orderBy('cmjt_job_name','ASC');
+	$result = $query->execute();
+
+	while($record = $result->fetchAssoc()) {
+		$trend_jobs[$record['CMJT_JOB_NAME']] = $record;
+	}
+	$markup .= "<pre>".print_r($trend_jobs,TRUE)."</pre>";
+
+	db_set_active();
+	return array('#markup' => '<p>' . t($markup) . '</p>');
+}
+
