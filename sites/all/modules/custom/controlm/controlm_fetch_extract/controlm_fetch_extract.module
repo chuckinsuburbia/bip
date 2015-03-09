@@ -20,7 +20,7 @@ function controlm_fetch_extract_menu () {
 	return $items;
 }
 function controlm_fetch_extract_execute() {
-  return array('#markup' => '<p>' . t(cmGetExport()) . '</p>');
+  return array('#markup' => '<p>' . t(_controlm_fetch_extract_main()) . '</p>');
 }
 function controlm_fetch_extract_form ($form, &$form_state) {
 	$form['controlm_fetch_extract_cron'] = array(
@@ -55,7 +55,7 @@ function controlm_fetch_extract_cron() {
 		$interval = variable_get('controlm_fetch_extract_interval',3600);
 		if (time() >= variable_get('controlm_fetch_extract_cron_next_execution', 0)) {
 			drupal_set_time_limit(0);
-			$res = cmGetExport();
+			$res = _controlm_fetch_extract_main();
 			watchdog('controlm_fetch_extract', 'controlm_fetch_extract_cron ran');
 			variable_set('controlm_fetch_extract_cron_next_execution', time() + $interval);
 		}
@@ -63,45 +63,98 @@ function controlm_fetch_extract_cron() {
 }
 
 
-function cmGetExport() {
+function _controlm_fetch_extract_main() {
 	ini_set('memory_limit','1G');
 	ini_set('max_execution_time',0);
-	db_set_active('bip');
 
 	$dbTables = array("cm_job_info","cm_sched_table","cm_job_properties","cm_prop_types","cm_job_on_properties","cm_on_types");
 	$return = "";
 
-	//$client = new nusoap_client('https://controlm/webservice/?wsdl', 'wsdl', false, false, false, false, 0, 600);
-	$client = new nusoap_client(variable_get('controlm_wsdl_client_url', ''), 'wsdl', false, false, false, false, 0, 600);
-	$err = $client->getError();
-	if ($err) return('<h2>Constructor error</h2><pre>' . $err . '</pre>');
-	
-	$proxy = $client->getProxy();
-	$url = $proxy->runExport();
-	//$url = "https://controlm/webservice/opsys.xml";
+	$pwd = dirname(__FILE__);
+	$extract_settings_file = $pwd.'/extract_settings.xml';
+	$extract_file = '/tmp/opsys.xml';
+	$remote_extract_settings_file = '/tmp/extract_settings.xml';
+	$remote_extract_file = '/tmp/opsys.xml';	
 
-	if ($client->fault) return("Client fault");
-	$err = $client->getError();
-	if ($err) return("Client error: ".$err);
+        $hostname = variable_get('controlm_hostname', '');
+        $username = variable_get('controlm_em_username', '');
+        $identity = variable_get('controlm_identity_file', '');
+        $known_hosts = variable_get('controlm_known_hosts_file', '');
 
-	$contents = file_get_contents($url);
-	$ctmExport = object_to_array(new SimpleXMLElement($contents));
+	$db_type = variable_get('controlm_em_db_type',array());
+        switch($db_type) {
+                case 'standard':
+                        global $databases;
+                        if(!isset($databases['ctmem'])) {
+                                drupal_set_message('There must be a database defined for "ctmem"','error');
+                                return;
+                        }
+			$remote_db_user = $databases['ctmem']['default']['username'];
+			$remote_db_pass = $databases['ctmem']['default']['password'];
+			$remote_db_host = $databases['ctmem']['default']['host'];
+                        break;
+                case 'oci8':
+                        $oci8 = variable_get('oci8',array());
+                        if(!isset($oci8['databases']['ctmem'])) {
+                                drupal_set_message('There must be an OCI8 database defined for "ctmem"','error');
+                                return;
+                        }
+			$remote_db_user = $oci8['databases']['ctmem']['default']['username'];
+			$remote_db_pass = $oci8['databases']['ctmem']['default']['password'];
+			$remote_db_host = $oci8['databases']['ctmem']['default']['hosts'][0];
+                        break;
+                default:
+                        drupal_set_message('Unknown DB driver '.$db_type.'.','error');
+			return;
+	}
+
+        $cmds = array(
+		'ssh -i '.$identity.' -o UserKnownHostsFile='.$known_hosts.' '.$username.'@'.$hostname.' "whoami" 2>&1',
+		'scp -i '.$identity.' -o UserKnownHostsFile='.$known_hosts.' '.$extract_settings_file.' '.$username.'@'.$hostname.':'.$remote_extract_settings_file.' 2>&1',
+		'ssh -i '.$identity.' -o UserKnownHostsFile='.$known_hosts.' '.$username.'@'.$hostname.' "exportdeftable -u '.$remote_db_user.' -p '.$remote_db_pass.' -s '.$remote_db_host.' -arg '.$remote_extract_settings_file.' -out '.$remote_extract_file.' 2>&1" 2>&1',
+		'scp -i '.$identity.' -o UserKnownHostsFile='.$known_hosts.' '.$username.'@'.$hostname.':'.$remote_extract_file.' '.$extract_file.' 2>&1',
+	);
+	foreach($cmds as $cmd) {
+		$output = "";
+	        exec($cmd,$output,$rc);
+//	        $return .= "<pre>".print_r($output,TRUE)."</pre>";
+		if($rc !== 0) {
+			drupal_set_message('Command returned error '.$rc.': '.$cmd,'error');
+			dsm($output);
+			return;
+		}
+	}
+
+
+	$contents = file_get_contents($extract_file);
+	$ctmExportXML = simplexml_load_string($contents, 'SimpleXMLElement', LIBXML_COMPACT | LIBXML_PARSEHUGE);
+	$ctmExport = object_to_array($ctmExportXML);
+//	$return .= "<pre>".print_r($contents,TRUE)."</pre>";
+//	return($return);
 	unset($contents);
 
 	foreach($dbTables as $tbl) {
-		$return .= "Backing up table ".$tbl."...";
-		dbTblBackup($tbl);
 		$return .= "Done<br />Truncating table ".$tbl."...";
-		dbTblEmpty($tbl);
+		db_truncate($tbl)->execute();
 		$return .= "Done<br />";
 	}
 
-	foreach($ctmExport['SCHED_TABLE'] as $table) {
+	if(isset($ctmExport['SCHED_TABLE'])) {
+		$sched_tables = $ctmExport['SCHED_TABLE'];
+		$name_field = "TABLE_NAME";
+	} elseif(isset($ctmExport['FOLDER'])) {
+		$sched_tables = $ctmExport['FOLDER'];
+		$name_field = "FOLDER_NAME";
+	} else {
+		drupal_set_message("Unable to find schedule tables in extract!",'error');
+		return;
+	}
+	foreach($sched_tables as $table) {
 		foreach($table['@attributes'] as $k => $v) {
 			if($k == "LAST_UPLOAD") $v = date('Y-m-d H:i:s',strtotime($v));
 			$att['CMT_'.$k] = $v;
 		}
-		$return .= "Inserting schedule table ".$table['@attributes']['TABLE_NAME']." into cm_sched_table...";
+		$return .= "Inserting schedule table ".$table['@attributes'][$name_field]." into cm_sched_table...";
 		$tblInsId = db_insert('cm_sched_table')->fields($att)->execute();
 		$return .= "Done<br />";
 		unset($att);
@@ -109,7 +162,7 @@ function cmGetExport() {
 		foreach($table['JOB'] as $job) {
 			if(!isset($job['@attributes']) || !isset($job['@attributes']['JOBNAME'])) continue;
 			foreach($job['@attributes'] as $k => $v) {
-				$att['CMJI_'.$k] = $v;
+				$att['CMJI_'.$k] = trim($v);
 			}
 			$att['CMJI_TABLE_ID'] = $tblInsId;
 			$return .= "&nbsp;&nbsp;Inserting job ".$job['@attributes']['JOBNAME']." into cm_job_info...";
@@ -129,7 +182,7 @@ function cmGetExport() {
 			}
 		}
 	}
-	db_set_active();
+
 	$return .= "<p>Processing Complete</p>";
 	return $return;
 }
@@ -148,7 +201,7 @@ function cmInsertJobProperty($attributes,$property,$jobInsId,&$known_attr,&$know
 		$data = array(
 			'CMJP_JOB_ID' => $jobInsId,
 			'CMJP_TYPE' => $typeInsId,
-			'CMJP_VALUE' => $v,
+			'CMJP_VALUE' => trim($v),
 			'CMJP_NUM' => $num);
 		db_insert('cm_job_properties')->fields($data)->execute();
 		$return .= "Done<br />";
@@ -183,7 +236,7 @@ function cmInsertOnProperty($attributes,$onKey,$jobInsId,$typeInsId,&$known_attr
 				'CMJOP_JOB_ID' => $jobInsId,
 				'CMJOP_PROP_TYPE' => $typeInsId,
 				'CMJOP_ON_TYPE' => $onInsId,
-				'CMJOP_VALUE' => $v,
+				'CMJOP_VALUE' => trim($v),
 				'CMJOP_NUM' => $num,
 				'CMJOP_SUBNUM' => $subnum);
 			db_insert('cm_job_on_properties')->fields($data)->execute();

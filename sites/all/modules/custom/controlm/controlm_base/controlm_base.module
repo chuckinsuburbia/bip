@@ -33,6 +33,68 @@ function controlm_wsdl_client_form ($form, &$form_state) {
                 '#description' => t('The URL to the Control-M Web Service which provides the path to the extract file.'),
                 '#required' => TRUE,
         );
+        $form['controlm_newday'] = array(
+                '#type' => 'textfield',
+                '#title' => t('New Day Time'),
+                '#default_value' => variable_get('controlm_newday', ''),
+                '#size' => 20,
+                '#maxlength' => 20,
+                '#description' => t('The time of the Control-M new day.'),
+                '#required' => TRUE,
+        );
+        $form['controlm_hostname'] = array(
+                '#type' => 'textfield',
+                '#title' => t('Control-M Host Name'),
+                '#default_value' => variable_get('controlm_hostname', ''),
+                '#size' => 64,
+                '#maxlength' => 255,
+                '#description' => t('The Host Name or IP address of Control-M server'),
+                '#required' => TRUE,
+        );
+        $form['controlm_identity_file'] = array(
+                '#type' => 'textfield',
+                '#title' => t('Identity File'),
+                '#default_value' => variable_get('controlm_identity_file', ''),
+                '#size' => 64,
+                '#maxlength' => 255,
+                '#description' => t('The SSH identity file that will be used to access the Control-M server'),
+                '#required' => TRUE,
+        );
+        $form['controlm_known_hosts_file'] = array(
+                '#type' => 'textfield',
+                '#title' => t('Known Hosts File'),
+                '#default_value' => variable_get('controlm_known_hosts_file', ''),
+                '#size' => 64,
+                '#maxlength' => 255,
+                '#description' => t('The SSH known hosts file that will be used to access the Control-M server'),
+                '#required' => TRUE,
+        );
+        $form['controlm_username'] = array(
+                '#type' => 'textfield',
+                '#title' => t('Control-M User Name'),
+                '#default_value' => variable_get('controlm_username', ''),
+                '#size' => 64,
+                '#maxlength' => 255,
+                '#description' => t('The username that will be used to access the Control-M server'),
+                '#required' => TRUE,
+        );
+        $form['controlm_em_username'] = array(
+                '#type' => 'textfield',
+                '#title' => t('Control-M EM User Name'),
+                '#default_value' => variable_get('controlm_em_username', ''),
+                '#size' => 64,
+                '#maxlength' => 255,
+                '#description' => t('The username that will be used to access CTMEM on the Control-M server'),
+                '#required' => TRUE,
+        );
+        $form['controlm_em_db_type'] = array(
+                '#type' => 'select',
+                '#title' => t('Control-M EM DB Type'),
+                '#default_value' => variable_get('controlm_em_db_type', array('standard' => 'standard')),
+		'#options' => array('standard' => 'standard', 'oci8' => 'oci8'),
+                '#description' => t('The DB driver for the CTMEM database'),
+                '#required' => TRUE,
+        );
         return system_settings_form($form);
 }
 
@@ -46,314 +108,5 @@ function controlm_base_permission() {
 		'access controlm administration' => array( 'title' => t('Administer the Control-M Module'), ),
 		'access controlm data feeds' => array( 'title' => t('Access data feeds for the Control-M module'), ),
 	);
-}
-
-function getJobNameOld($name){
-	db_set_active('bip');
-	$query = db_select('cm_job_naming2','cjn')->fields('cjn',array('cmjn_section','cmjn_abbr','cmjn_desc'));
-	$result = $query->execute();
-	while($row = $result->fetchAssoc()) {
-		$job_naming[$row['cmjn_section']][$row['cmjn_abbr']] = $row['cmjn_desc'];
-	}
-
-	$section[1] = substr($name,0,1);
-	if(strtoupper($section[1]) != 'M' && strtoupper($section[1]) != 'C'){
-		db_set_active();
-		return "";
-	}
-	$section[2] = substr($name,1,2);
-	$section[3] = substr($name,3,1);
-	$section[4] = substr($name,4,1);
-	$section[5] = substr($name,5,1);
-	$section[6] = substr($name,6);
-	//return $section;
-	if(!isset($job_naming[1][strtoupper($section[1])]) ||
-	   !isset($job_naming[2][strtoupper($section[2])]) ||
-	   !isset($job_naming[3][strtoupper($section[3])]) ||
-	   !isset($job_naming[4][strtoupper($section[4])]) ||
-	   !isset($job_naming[5][strtoupper($section[5])])){
-		db_set_active();
-		return "";
-	}
-
-	$jobname = ord($section[1]) > 96 ? "OLD NAME Test " : "OLD NAME ";
-	$jobname .= ucwords(strtolower($job_naming[1][strtoupper($section[1])]))." ";
-	$jobname .= ucwords(strtolower($job_naming[2][strtoupper($section[2])]))." ";
-	$jobname .= ucwords(strtolower($job_naming[3][strtoupper($section[3])]))." ";
-	$jobname .= ucwords(strtolower($job_naming[4][strtoupper($section[4])]))." ";
-	$jobname .= ucwords(strtolower($job_naming[5][strtoupper($section[5])]))." ";
-	$jobname .= "(".$section[6].")";
-
-	db_set_active();
-	return $jobname;
-}
-
-function getJobNameOldArray($name){
-	db_set_active('bip');
-	$query = db_select('cm_job_naming2','cjn')->fields('cjn',array('cmjn_section','cmjn_abbr','cmjn_desc'));
-	$result = $query->execute();
-	while($row = $result->fetchAssoc()) {
-		$job_naming[$row['cmjn_section']][$row['cmjn_abbr']] = $row['cmjn_desc'];
-	}
-
-	$section[1] = substr($name,0,1);
-	if(strtoupper($section[1]) != 'M' && strtoupper($section[1]) != 'C'){
-		db_set_active();
-		return "";
-	}
-	$section[2] = substr($name,1,2);
-	$section[3] = substr($name,3,1);
-	$section[4] = substr($name,4,1);
-	$section[5] = substr($name,5,1);
-	$section[6] = substr($name,6);
-	// return $section;
-	if(!isset($job_naming[1][strtoupper($section[1])]) ||
-	   !isset($job_naming[2][strtoupper($section[2])]) ||
-	   !isset($job_naming[3][strtoupper($section[3])]) ||
-	   !isset($job_naming[4][strtoupper($section[4])]) ||
-	   !isset($job_naming[5][strtoupper($section[5])])){
-		db_set_active();
-		return "";
-	}
-
-	$jobname[] = ord($section[1]) > 96 ? "OLD NAME Test" : "OLD NAME";
-	$jobname[] = ucwords(strtolower($job_naming[1][strtoupper($section[1])]));
-	$jobname[] = ucwords(strtolower($job_naming[2][strtoupper($section[2])]));
-	$jobname[] = ucwords(strtolower($job_naming[3][strtoupper($section[3])]));
-	$jobname[] = ucwords(strtolower($job_naming[4][strtoupper($section[4])]));
-	$jobname[] = ucwords(strtolower($job_naming[5][strtoupper($section[5])]));
-	$jobname[] = "(".$section[6].")";
-
-	db_set_active();
-	return $jobname;
-}
-
-function getJobNameOldArrayTest($name){
-	db_set_active('bip');
-	$query = db_select('cm_job_naming2','cjn')->fields('cjn',array('cmjn_section','cmjn_abbr','cmjn_desc'));
-	$result = $query->execute();
-	while($row = $result->fetchAssoc()) {
-		$job_naming[$row['cmjn_section']][$row['cmjn_abbr']] = $row['cmjn_desc'];
-	}
-
-	$section[1] = substr($name,0,1);
-	if(strtoupper($section[1]) != 'M' && strtoupper($section[1]) != 'C'){
-		db_set_active();
-		return "";
-	}
-	$section[2] = substr($name,1,2);
-	$section[3] = substr($name,3,1);
-	$section[4] = substr($name,4,1);
-	$section[5] = substr($name,5,1);
-	$section[6] = substr($name,6);
-	//    return $section;
-	if(!isset($job_naming[1][strtoupper($section[1])]) ||
-	   !isset($job_naming[2][strtoupper($section[2])]) ||
-	   !isset($job_naming[3][strtoupper($section[3])]) ||
-	   !isset($job_naming[4][strtoupper($section[4])]) ||
-	   !isset($job_naming[5][strtoupper($section[5])])){
-		db_set_active();
-		return "";
-	}
-
-	$jobname[] = ord($section[1]) > 96 ? "OLD NAME Test" : "OLD NAME";
-	$jobname[] = ucwords(strtolower($job_naming[1][strtoupper($section[1])]));
-	$jobname[] = ucwords(strtolower($job_naming[2][strtoupper($section[2])]));
-	$jobname[] = ucwords(strtolower($job_naming[3][strtoupper($section[3])]));
-	$jobname[] = ucwords(strtolower($job_naming[4][strtoupper($section[4])]));
-	$jobname[] = ucwords(strtolower($job_naming[5][strtoupper($section[5])]));
-	$jobname[] = "(".$section[6].")";
-	
-	db_set_active();
-	return $jobname;
-}
-
-function getJobName($name){
-	db_set_active('bip');
-	$query = db_select('cm_job_naming2','cjn')->fields('cjn',array('cmjn_section','cmjn_abbr','cmjn_desc'));
-	$result = $query->execute();
-	while($row = $result->fetchAssoc()) {
-		$job_naming[$row['cmjn_section']][$row['cmjn_abbr']] = $row['cmjn_desc'];
-	}
-        //need to handle mainframe job name convention
-        // Open Sytems
-        // 1 = Location  2,3 = Application  4,5 = Function  6 = Schedule  7,8,9,10 = Sequence
-        // Mainframe
-        // 1 = Location  2,3 = Application  4,5 = Schedule  6 = Sequence  7,8 = Function
-        $section[1] = substr($name,0,1);
-        $section[2] = substr($name,1,2);
-
-	if(strtoupper($section[1]) == "U" || strtoupper($section[1]) == "W" || strtoupper($section[1]) == "Q"){
-		$gs = 22;
-		$section[3] = substr($name,3,2);
-		$section[4] = substr($name,5,1);
-		$section[5] = substr($name,6);
-		if(!isset($job_naming[1][strtoupper($section[1])]) ||
-		   !isset($job_naming[$gs][strtoupper($section[2])]) ||
-		   !isset($job_naming[3][strtoupper($section[3])]) ||
-		   !isset($job_naming[4][strtoupper($section[4])])){
-			db_set_active();
-			return getJobNameOld($name);
-		}
-
-		$jobname = ord($section[1]) > 96 ? "Test " : "";
-		$jobname .= ucwords(strtolower($job_naming[1][strtoupper($section[1])]))." ";
-		$jobname .= ucwords(strtolower($job_naming[$gs][strtoupper($section[2])]))." ";
-		$jobname .= ucwords(strtolower($job_naming[3][strtoupper($section[3])]))." ";
-		$jobname .= ucwords(strtolower($job_naming[4][strtoupper($section[4])]))." ";
-		$jobname .= "(".$section[5].")";
-
-		db_set_active();
-		return $jobname;
-	}else{ //Mainframe job
-		// 1 = Location  2,3 = Application  4,5 = Schedule  6 = Sequence  7,8 = Function
-		$gs = 21;
-		$section[3] = substr($name,3,2);
-		$section[4] = substr($name,5,1);
-		$section[5] = substr($name,6,2);
-		if(!isset($job_naming[1][strtoupper($section[1])]) ||
-		   !isset($job_naming[$gs][strtoupper($section[2])]) ||
-		   !isset($job_naming[4][strtoupper($section[3])]) ||
-		   !isset($job_naming[3][strtoupper($section[5])])){
-			db_set_active();
-			return getJobNameOldArray($name);
-		}
-
-		$jobname = ord($section[1]) > 96 ? "Test " : "";
-		$jobname .= ucwords(strtolower($job_naming[1][strtoupper($section[1])]))." ";
-		$jobname .= ucwords(strtolower($job_naming[$gs][strtoupper($section[2])]))." ";
-		$jobname .= ucwords(strtolower($job_naming[4][strtoupper($section[3])]))." ";
-		$jobname .= $section[4];
-		$jobname .= ucwords(strtolower($job_naming[3][strtoupper($section[5])]))." ";
-
-		db_set_active();
-		return $jobname;
-	}
-}
-
-function getJobNameArray($name){
-	db_set_active('bip');
-	$query = db_select('cm_job_naming2','cjn')->fields('cjn',array('cmjn_section','cmjn_abbr','cmjn_desc'));
-	$result = $query->execute();
-	while($row = $result->fetchAssoc()) {
-		$job_naming[$row['cmjn_section']][$row['cmjn_abbr']] = $row['cmjn_desc'];
-	}
-	//need to handle mainframe job name convention
-	// Open Sytems
-	// 1 = Location  2,3 = Application  4,5 = Function  6 = Schedule  7,8,9,10 = Sequence
-	// Mainframe
-	// 1 = Location  2,3 = Application  4,5 = Schedule  6 = Sequence  7,8 = Function
-	$section[1] = substr($name,0,1);
-	$section[2] = substr($name,1,2);
-
-	if(strtoupper($section[1]) == "U" || strtoupper($section[1]) == "W" || strtoupper($section[1]) == "Q"){
-		$gs = 22;
-		$section[3] = substr($name,3,2);
-		$section[4] = substr($name,5,1);
-		$section[5] = substr($name,6);
-		if(!isset($job_naming[1][strtoupper($section[1])]) ||
-		   !isset($job_naming[$gs][strtoupper($section[2])]) ||
-		   !isset($job_naming[3][strtoupper($section[3])]) ||
-		   !isset($job_naming[4][strtoupper($section[4])])){
-			db_set_active();
-			return getJobNameOldArray($name);
-		}
-
-		//    $jobname[] = ord($section[1]) > 96 ? "Test " : "";
-		$jobname[] = ucwords(strtolower($job_naming[1][strtoupper($section[1])]))." ";
-		$jobname[] = ucwords(strtolower($job_naming[$gs][strtoupper($section[2])]))." ";
-		$jobname[] = ucwords(strtolower($job_naming[3][strtoupper($section[3])]))." ";
-		$jobname[] = ucwords(strtolower($job_naming[4][strtoupper($section[4])]))." ";
-		$jobname[] = "(".$section[5].")";
-
-		db_set_active();
-		return $jobname;
-	}else{ //Mainframe job
-		// 1 = Location  2,3 = Application  4,5 = Schedule  6 = Sequence  7,8 = Function
-		$gs = 21;
-		$section[3] = substr($name,3,2);
-		$section[4] = substr($name,5,1);
-		$section[5] = substr($name,6,2);
-		if(!isset($job_naming[1][strtoupper($section[1])]) ||
-		   !isset($job_naming[$gs][strtoupper($section[2])]) ||
-		   !isset($job_naming[4][strtoupper($section[3])]) ||
-		   !isset($job_naming[3][strtoupper($section[5])])){
-			db_set_active();
-			return getJobNameOldArray($name);
-		}
-
-		//    $jobname[] = ord($section[1]) > 96 ? "Test " : "";
-		$jobname[] = ucwords(strtolower($job_naming[1][strtoupper($section[1])]))." ";
-		$jobname[] = ucwords(strtolower($job_naming[$gs][strtoupper($section[2])]))." ";
-		$jobname[] = ucwords(strtolower($job_naming[4][strtoupper($section[3])]))." ";
-		$jobname[] = $section[4];
-		$jobname[] = ucwords(strtolower($job_naming[3][strtoupper($section[5])]))." ";
-
-		db_set_active();
-		return $jobname;
-	}
-}
-
-function getJobNameOnly2($name){
-	db_set_active('bip');
-	$query = db_select('cm_job_naming2','cjn')->fields('cjn',array('cmjn_section','cmjn_abbr','cmjn_desc'));
-	$result = $query->execute();
-	while($row = $result->fetchAssoc()) {
-		$job_naming[$row['cmjn_section']][$row['cmjn_abbr']] = $row['cmjn_desc'];
-	}
-	//need to handle mainframe job name convention
-	// Open Sytems
-	// 1 = Location  2,3 = Application  4,5 = Function  6 = Schedule  7,8,9,10 = Sequence
-	// Mainframe
-	// 1 = Location  2,3 = Application  4,5 = Schedule  6 = Sequence  7,8 = Function
-	$section[1] = substr($name,0,1);
-	$section[2] = substr($name,1,2);
-
-	if(strtoupper($section[1]) == "U" || strtoupper($section[1]) == "W" || strtoupper($section[1]) == "Q"){
-		$gs = 22;
-		$section[3] = substr($name,3,2);
-		$section[4] = substr($name,5,1);
-		$section[5] = substr($name,6);
-		if(!isset($job_naming[1][strtoupper($section[1])]) ||
-		   !isset($job_naming[$gs][strtoupper($section[2])]) ||
-		   !isset($job_naming[3][strtoupper($section[3])]) ||
-		   !isset($job_naming[4][strtoupper($section[4])])){
-			db_set_active();
-			return "";
-		}
-
-		$jobname = ord($section[1]) > 96 ? "Test " : "";
-		$jobname .= ucwords(strtolower($job_naming[1][strtoupper($section[1])]))." ";
-		$jobname .= ucwords(strtolower($job_naming[$gs][strtoupper($section[2])]))." ";
-		$jobname .= ucwords(strtolower($job_naming[3][strtoupper($section[3])]))." ";
-		$jobname .= ucwords(strtolower($job_naming[4][strtoupper($section[4])]))." ";
-		$jobname .= "(".$section[5].")";
-
-		db_set_active();
-		return $jobname;
-	}else{ //Mainframe job
-		// 1 = Location  2,3 = Application  4,5 = Schedule  6 = Sequence  7,8 = Function
-		$gs = 21;
-		$section[3] = substr($name,3,2);
-		$section[4] = substr($name,5,1);
-		$section[5] = substr($name,6,2);
-		if(!isset($job_naming[1][strtoupper($section[1])]) ||
-		   !isset($job_naming[$gs][strtoupper($section[2])]) ||
-		   !isset($job_naming[4][strtoupper($section[3])]) ||
-		   !isset($job_naming[3][strtoupper($section[5])])){
-			db_set_active();
-			return "";
-		}
-
-		$jobname = ord($section[1]) > 96 ? "Test " : "";
-		$jobname .= ucwords(strtolower($job_naming[1][strtoupper($section[1])]))." ";
-		$jobname .= ucwords(strtolower($job_naming[$gs][strtoupper($section[2])]))." ";
-		$jobname .= ucwords(strtolower($job_naming[4][strtoupper($section[3])]))." ";
-		$jobname .= $section[4];
-		$jobname .= ucwords(strtolower($job_naming[3][strtoupper($section[5])]))." ";
-
-		db_set_active();
-		return $jobname;
-	}
 }
 

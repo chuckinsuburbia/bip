@@ -51,6 +51,10 @@ function controlm_view_job_list_form ($form, &$form_state) {
 		'#title' => t('CTM Group'),
 		'#type' => 'textfield',
 	);
+	$form['group1']['cmjp_value'] = array(
+		'#title' => t('Property Value'),
+		'#type' => 'textfield',
+	);
 	$form['orderby_options'] = array(
 		'#type' => 'value',
 		'#value' => array(
@@ -107,43 +111,15 @@ function controlm_view_job_list_form_submit ($form, &$form_state) {
 		}
 	}
 
-/*
-	//Get array of job docs
-	$query = new EntityFieldQuery();
-	$entities = $query->entityCondition('entity_type','node')->propertyCondition('type','job_document')->execute();
-	if (!empty($entities['node'])) {
-		foreach($entities['node'] as $ent_key => $ent_node) {
-			$node = node_load($ent_key);
-			$jobdocs[$node->field_job_name['und'][0]['value']][$node->field_node_id['und'][0]['value']] = drupal_get_path_alias('node/'.$ent_key);
-		}
-	}
-*/
-
 
 	//Set up render array 
 	$table = array(
 		'#theme' => 'table',
 		'#header' => array(t('Status'),t('Job Name'),t('Node'),t('Description'),t('Start Time'),t('Doc'),t('Info'),t('Chart')),
-//		'#header' => array(t('Job Name'),t('Node'),t('Description'),t('Doc'),t('Info'),t('Chart')),
 		'#rows' => array(),
 	);
 
 	//Query DB
-
-/*
-	foreach($form_state['values'] as $k => $v) {
-		if(!strstr($k,'orderby') && !strstr($k,'form_') && $k !== 'submit' && $k !== 'op' && $v !== '') {
-			$where[] = $k." LIKE '%".$v."%'";
-		}
-	}
-
-	oci8_db_set_active('CMDV');
-	$sql = "SELECT JOB_NAME,NODE_ID,DESCRIPTION,TABLE_ID FROM EMUSER.DEF_JOB";
-	$sql.= isset($where) ? " WHERE ".implode(' AND ',$where) : "";
-	$sql.= " ORDER BY ".$form_state['values']['orderby']." ASC";
-	$result = oci8_db_query($sql);
-*/
-
 	foreach($form_state['values'] as $k => $v) {
 		if(!(strstr($k,'cmji_') || strstr($k,'cmjp_')) || $v == '') {
 			continue;
@@ -154,7 +130,8 @@ function controlm_view_job_list_form_submit ($form, &$form_state) {
 	db_set_active('bip');
 	$query = db_select('cm_job_info','cmji');
 	$query->leftJoin('cm_job_status','cmjs','cmji.cmji_jobname = cmjs.cmjs_job_name AND cmji.cmji_nodeid = cmjs.cmjs_cpu_id');
-	$query->fields('cmji',array('cmji_jobname','cmji_nodeid','cmji_description','cmji_table_id'));
+	$query->leftJoin('cm_job_properties','cmjp','cmji.cmji_id = cmjp.cmjp_job_id');
+	$query->fields('cmji',array('cmji_jobname','cmji_nodeid','cmji_description','cmji_table_id','cmji_id'));
 	$query->fields('cmjs',array('cmjs_status','cmjs_start_time'));
 	if(isset($where)) {
 		foreach($where as $k => $v) {
@@ -162,6 +139,7 @@ function controlm_view_job_list_form_submit ($form, &$form_state) {
 		}
 	}
 	$query->orderBy($form_state['values']['orderby']);
+	$query->distinct();
 	$result = $query->execute();
 	db_set_active();
 	
@@ -195,18 +173,19 @@ function controlm_view_job_list_form_submit ($form, &$form_state) {
 		}
 
 		//Look up Job Document node
-		$query = new EntityFieldQuery();
-		$query->entityCondition('entity_type','node');
-		$query->propertyCondition('type','job_document');
-		$query->propertyCondition('status', 1);
-		$query->fieldCondition('field_job_name', 'tid', $job_name_tid, '=');
-		$query->fieldCondition('field_node_id', 'tid', $node_id_tid, '=');
-		$jd_result = $query->execute();
-		if (!empty($jd_result['node'])) {
-			$jobdoc_nids = array_keys($jd_result['node']);
-			$doc = "<a href='/".drupal_get_path_alias('node/'.$jobdoc_nids[0])."'>Doc</a>";
-		} else {
-			$doc = "";
+		$doc = "";
+		if(isset($job_name_tid) && isset($node_id_tid)) {
+			$query = new EntityFieldQuery();
+			$query->entityCondition('entity_type','node');
+			$query->propertyCondition('type','job_document');
+			$query->propertyCondition('status', 1);
+			$query->fieldCondition('field_job_name', 'tid', $job_name_tid, '=');
+			$query->fieldCondition('field_node_id', 'tid', $node_id_tid, '=');
+			$jd_result = $query->execute();
+			if (!empty($jd_result['node'])) {
+				$jobdoc_nids = array_keys($jd_result['node']);
+				$doc = "<a href='/".drupal_get_path_alias('node/'.$jobdoc_nids[0])."' target='_blank'>Doc</a>";
+			}
 		}
 		
 /*
@@ -223,7 +202,7 @@ function controlm_view_job_list_form_submit ($form, &$form_state) {
 			t($record['cmji_description']),
 			t($record['cmjs_start_time']),
 			$doc,
-			t('<a href="/job-information?job_name='.$record['cmji_jobname'].'" target="_blank">Info</a>'),
+			t('<a href="/job-information?job_name='.$record['cmji_jobname'].'&jobid='.$record['cmji_id'].'" target="_blank">Info</a>'),
 			t('<a href="/job-runtime-chart?job_name='.$record['cmji_jobname'].'&node='.$record['cmji_nodeid'].'" target="_blank">Chart</a>'),
 		);
 	}
