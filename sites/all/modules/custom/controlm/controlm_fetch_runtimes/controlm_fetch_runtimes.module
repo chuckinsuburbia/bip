@@ -67,8 +67,6 @@ function cmGetRuntime() {
 	ini_set('memory_limit','1G');
 	ini_set('max_execution_time',0);
 
-	db_set_active('bip');
-
 	$return = "";
 
 	$end   = date('YmdHis',time());
@@ -158,7 +156,6 @@ function cmGetRuntime() {
 		}
 	}
 
-	db_set_active();
 	variable_set('controlm_fetch_runtimes_last_execution', $end);
 	return($return);
 }

@@ -67,49 +67,93 @@ function cmGetJobStats() {
 	ini_set('memory_limit','1G');
 	ini_set('max_execution_time',0);
 
-	db_set_active('bip');
-
 	$return = "";
 
-	$odate = date('ymd');
-	$return .= $odate."<br />";
+	$newday = strtotime(variable_get('controlm_newday',''));
+	$now = strtotime('now');
+	$return .= "Newday: ".date('h:i',$newday)."<br />";
+	$return .= "Current Time: ".date('h:i',$now)."<br />";
 
-	$client = new nusoap_client(variable_get('controlm_wsdl_client_url', ''), 'wsdl', false, false, false, false, 0, 600);
-	$err = $client->getError();
-	if ($err) {
-		die( '<h2>Constructor error</h2><pre>' . $err . '</pre>');
-	}
-	$proxy = $client->getProxy();
-
-	$result = $proxy->getJobStats($odate);
-	if ($client->fault) {
-		$return = "Client fault";
+	if($now < $newday) {
+		$odate = date('ymd',strtotime('yesterday'));
 	} else {
-		$err = $client->getError();
-		if ($err) {
-			$return = "Client error: ".$err;
-		} else {
-			//$return .= "<pre>".print_r($result,TRUE)."</pre>";
-			$return .= "Backing up table cm_job_status...";
-			dbTblBackup('cm_job_status');
-			$return .= "Done<br />Truncating table cm_job_status...";
-			dbTblEmpty('cm_job_status');
-			$return .= "Done<br />";
+		$odate = date('ymd');
+	}
+	$return .= "Effective date: ".$odate."<br />";
 
-			foreach($result as $job) {
-				foreach($job as $k => $v) {
-					if($v != ' ') {
-						$data['cmjs_'.$k] = $v;
-					}
+	$db_type = variable_get('controlm_em_db_type',array());
+	switch($db_type) {
+                case 'standard':
+                        global $databases;
+                        if(!isset($databases['ctmem'])) {
+                                drupal_set_message('There must be a database defined for "ctmem"','error');
+                                return;
+                        }
+			db_set_active('ctmem');
+			$tables = db_select('information_schema.tables','t')
+				->fields('t',array('table_name'))
+				->condition(db_and()->condition('table_schema','public','=')->condition('table_name','%'.$odate.'%job','LIKE'))
+				->execute();
+			while($table = $tables->fetchAssoc()) {
+				$return .= "Found table: ".$table['table_name']."<br />";
+				$jobs = db_select($table['table_name'],'j')
+					->fields('j',array('ORDER_ID','APPLICATION','GROUP_NAME','MEMNAME','JOB_NAME','ODATE','CPU_ID','STATUS','STATE','DELETE_FLAG','START_TIME','END_TIME'))
+					->execute();
+				while($job = $jobs->fetchAssoc()) {
+					$result[] = $job;
 				}
-				$return .= "Insert job ".$job['job_name'].", order ID ".$job['order_id']."<br />";
-				db_insert('cm_job_status')->fields($data)->execute();
-				unset($data);
+			}
+			db_set_active();
+                        break;
+                case 'oci8':
+                        $oci8 = variable_get('oci8',array());
+                        if(!isset($oci8['databases']['ctmem'])) {
+                                drupal_set_message('There must be an OCI8 database defined for "ctmem"','error');
+                                return;
+                        }
+			oci8_db_set_active('ctmem');
+
+			$sql = "BEGIN EMUSER.BIP_PERMISSIONS.GRANT_SELECT_TABLE; END;";
+			oci8_db_query($sql)->execute();
+
+			$sql = 'SELECT TABLE_NAME FROM ALL_TABLES WHERE TABLE_NAME LIKE \'%'.$odate.'%JOB\'';
+			$tbl_query = oci8_db_query($sql);
+			$tbl_query->execute();
+			while($table = $tbl_query->fetchAssoc()) {
+				$return .= "Found table: ".$table['TABLE_NAME']."<br />";
+				$sql = "SELECT ORDER_ID,APPLICATION,GROUP_NAME,MEMNAME,JOB_NAME,ODATE,CPU_ID,STATUS,STATE,DELETE_FLAG,START_TIME,END_TIME FROM EMUSER.".$table['TABLE_NAME'];
+				$job_query = oci8_db_query($sql);
+				$job_query->execute();
+				while($job = $job_query->fetchAssoc()) {
+					$result[] = $job;
+				}
+			}
+                        break;
+                default:
+                        drupal_set_message('Unknown DB driver '.$db_type.'.','error');
+                        return;
+        }
+
+//	$return .= "<pre>".print_r($result,TRUE)."</pre>";
+
+	$return .= "Truncating table cm_job_status...";
+	db_truncate('cm_job_status')->execute();
+	$return .= "Done<br />";
+
+	foreach($result as $job) {
+		//force array keys to be lowercase
+		$job_lower = array_change_key_case($job, CASE_LOWER);
+		$data = array();
+		foreach($job_lower as $k => $v) {
+			if($v != ' ') {
+				$data['cmjs_'.$k] = $v;
 			}
 		}
+		$return .= "Insert job ".implode(', ',$job_lower)."<br />";
+		db_insert('cm_job_status')->fields($data)->execute();
+		unset($data);
 	}
 
-	db_set_active();
 	return($return);
 }
 
