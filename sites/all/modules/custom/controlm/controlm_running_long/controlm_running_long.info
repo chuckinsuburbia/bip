@@ -1,0 +1,8 @@
+name = Control-M Running Long
+description = This module contains functions to display Control-M jobs that are currently running for longer than average."
+core = 7.x
+package = "control-m"
+configure = admin/config/services/controlm/purge_db
+dependencies[] = controlm_create_job_average
+
+version = "7.x-X.X"

@@ -84,7 +84,6 @@ function cmGetRuntime() {
 	if($rc !== 0) {
 		drupal_set_message('Command returned error '.$rc.': '.$cmd,'error');
 		dsm($output);
-		db_set_active();
 		return;
 	}
 

@@ -98,8 +98,6 @@ function cmCalcTrending() {
 	ini_set('memory_limit','1G');
 	ini_set('max_execution_time',0);
 
-	db_set_active('bip');
-
 	$num_execs = variable_get('controlm_calc_trending_num_execs',10);
 	$threshold = variable_get('controlm_calc_trending_alarm_threshold','0.2');
 
@@ -229,7 +227,6 @@ function cmCalcTrending() {
 */
 	//$return .= "<pre>".print_r($jobs,TRUE)."</pre>";
 	
-	db_set_active();
 	return($return.$return2);
 }
 

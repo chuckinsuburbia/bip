@@ -114,7 +114,6 @@ function controlm_execute_request_list_jobs_get_ajax() {
 //	$return .= "<pre>".print_r($jobdocs,TRUE)."</pre>";
 
 	//Query DB for jobs in Wait User status
-	db_set_active('bip');
 	foreach($userjobs as $groupname => $groupjobs) {
 		$query = db_select('cm_job_status','cjs');
 		$query->fields('cjs');
@@ -123,11 +122,10 @@ function controlm_execute_request_list_jobs_get_ajax() {
 		$query->orderBy('cmjs_job_name');
 		$result = $query->execute();
 		while($record = $result->fetchAssoc()) {
-			$jobname = strtolower($record['CMJS_JOB_NAME']);
+			$jobname = strtolower($record['cmjs_job_name']);
 			$waitjobs[$groupname][$jobname] = array('status' => $record, 'jobdoc' => $jobdocs[$jobname]);
 		}
 	}	
-	db_set_active();
 //	$return .= "<pre>".print_r($waitjobs,TRUE)."</pre>";
 
 	//Set up render array
@@ -139,15 +137,16 @@ function controlm_execute_request_list_jobs_get_ajax() {
 			'#rows' => array(),
 		);
 		foreach($jobs as $jobname => $jobprop) {
+			$doc = isset($jobprop['jobdoc']->nid) ? "<a href='/".drupal_get_path_alias('node/'.$jobprop['jobdoc']->nid)."'>Doc</a>" : "";
 			$table['#rows'][] = array(
-				t($jobprop['status']['CMJS_JOB_NAME']),
-				t($jobprop['status']['CMJS_NODE_ID']),
-				t($jobprop['status']['CMJS_ODATE']),
-				t($jobprop['status']['CMJS_STATUS']),
-				t($jobprop['status']['CMJS_STATE']),
+				t($jobprop['status']['cmjs_job_name']),
+				t($jobprop['status']['cmjs_node_id']),
+				t($jobprop['status']['cmjs_odate']),
+				t($jobprop['status']['cmjs_status']),
+				t($jobprop['status']['cmjs_state']),
 				array('data' => t($jobprop['jobdoc']->field_command_line['und'][0]['value']),'style' => 'word-break:break-all;'),
-				t("<a href='/".drupal_get_path_alias('node/'.$jobprop['jobdoc']->nid)."'>Doc</a>"),
-				t('<a href="#" onclick="controlm_execute_request_ctmwhy_ajax_load(\''.$jobprop['status']['CMJS_JOB_NAME'].'\',\''.$jobprop['status']['CMJS_ORDER_ID'].'\');scrollToTop();">Why</a>'),
+				t($doc),
+				t('<a href="#" onclick="controlm_execute_request_ctmwhy_ajax_load(\''.$jobprop['status']['cmjs_job_name'].'\',\''.$jobprop['status']['cmjs_order_id'].'\');scrollToTop();">Why</a>'),
 			);
 		}
 		$return .= theme('table',$table);

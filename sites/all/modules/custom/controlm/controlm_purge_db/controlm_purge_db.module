@@ -13,15 +13,29 @@ function controlm_purge_db_menu () {
 	);
 	$items['controlm/purge_db'] = array(
 		'title' => 'Purge DB Entries',
-		'page callback' => 'controlm_purge_db_execute',
+		'page callback' => 'controlm_purge_db_page',
 		'access arguments' => array('access controlm data feeds'),
 		'type' => MENU_NORMAL_ITEM,
 	);
+	$items['ajax/controlm/purge_db/pleasewait'] = array(
+                'page callback' => 'controlm_purge_db_pleasewait_get_ajax',
+                'delivery callback' => 'controlm_purge_db_pleasewait_ajax_callback',
+                'access arguments' => array('access controlm data feeds'),
+                'type' => MENU_CALLBACK,
+        );
+	$items['ajax/controlm/purge_db/execute'] = array(
+                'page callback' => 'controlm_purge_db_execute_get_ajax',
+                'delivery callback' => 'controlm_purge_db_execute_ajax_callback',
+                'access arguments' => array('access controlm data feeds'),
+                'type' => MENU_CALLBACK,
+        );
 	return $items;
 }
+/*
 function controlm_purge_db_execute() {
   return array('#markup' => '<p>' . t(cmPurgeDB()) . '</p>');
 }
+*/
 function controlm_purge_db_form ($form, &$form_state) {
 	$form['controlm_purge_db_cron'] = array(
 		'#type' => 'checkbox',
@@ -71,19 +85,45 @@ function controlm_purge_db_cron() {
 		$interval = variable_get('controlm_purge_db_interval',3600);
 		if (time() >= variable_get('controlm_purge_db_next_execution', 0)) {
 			drupal_set_time_limit(0);
-			$res = cmPurgeDB();
+			$res = controlm_purge_db_execute_get_ajax();
 			watchdog('controlm_purge_db', 'controlm_purge_db_cron ran');
 			variable_set('controlm_purge_db_next_execution', time() + $interval);
 		}
 	}
 }
 
+function controlm_purge_db_page() {
+        drupal_add_library('system', 'drupal.ajax');
 
-function cmPurgeDB() {
+        $markup = "";
+
+        $markup .= <<<EOM
+<code><div id="ajax-target-command-status"></div></code>
+<div id="ajax-target-output">Please wait one moment...</div>
+<script>
+        function controlm_purge_db_output_ajax_load() {
+                jQuery("#ajax-target-output").load("/ajax/controlm/purge_db/pleasewait");
+                jQuery("#ajax-target-output").load("/ajax/controlm/purge_db/execute");
+        }
+        jQuery(document).ready(function($){controlm_purge_db_output_ajax_load();});
+</script>
+EOM;
+
+        return(array('#markup' => t($markup)));
+}
+
+function controlm_purge_db_pleasewait_get_ajax() {
+        $return = "<hr />Please wait one moment...<br /><img src='".file_create_url('public://preloader.gif')."' width='50px' />";
+
+        return $return;
+}
+function controlm_purge_db_pleasewait_ajax_callback($page_callback_result) {
+        echo($page_callback_result);
+}
+
+function controlm_purge_db_execute_get_ajax() {
 	ini_set('memory_limit','1G');
 	ini_set('max_execution_time',0);
-
-	db_set_active('bip');
 
 	$return = "";
 
@@ -94,8 +134,8 @@ function cmPurgeDB() {
 		->fields('cjr',array('cmjr_id'))
 		->where('cmjr_timestamp < DATE_SUB(NOW(), INTERVAL '.$hist_span.')');
 
-//	$num_rows = $query->countQuery()->execute()->fetchField();
-//	$return .= "<p>Number of rows affected: ".$num_rows."</p>";
+	$num_rows = $query->countQuery()->execute()->fetchField();
+	$return .= "<p>Number of rows affected: ".$num_rows."</p>";
 
 	$result = $query->execute();
 	while($record = $result->fetchAssoc()) {
@@ -103,10 +143,12 @@ function cmPurgeDB() {
 		$return .= "<pre>".print_r($record,TRUE)."</pre>";
 		db_delete('cm_jobs_run')->condition('cmjr_id',$record['cmjr_id'],'=')->execute();
 		$return .= "Done.<br />";
-		usleep(100); //sleep for 100 microseconds so other DB queries don't get jammed up
+		usleep(10); //sleep for 10 microseconds so other DB queries don't get jammed up
 	}
 
-	db_set_active();
 	return($return);
+}
+function controlm_purge_db_execute_ajax_callback($page_callback_result) {
+        echo($page_callback_result);
 }
 

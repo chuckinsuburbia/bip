@@ -39,6 +39,24 @@ function controlm_fetch_extract_form ($form, &$form_state) {
 		'#description' => t('The number of seconds between Cron executions.'),
 		'#required' => TRUE,
 	);
+	$form['controlm_fetch_extract_username'] = array(
+		'#type' => 'textfield',
+		'#title' => t('User Name'),
+		'#default_value' => variable_get('controlm_fetch_extract_username',''),
+		'#size' => 10,
+		'#maxlength' => 20,
+		'#description' => t('The username that has access to the "exportdeftable" command.'),
+		'#required' => TRUE,
+	);
+	$form['controlm_fetch_extract_password'] = array(
+		'#type' => 'password',
+		'#title' => t('User Password'),
+		'#default_value' => variable_get('controlm_fetch_extract_password',''),
+		'#size' => 10,
+		'#maxlength' => 20,
+		'#description' => t('The password for above user.'),
+		'#required' => TRUE,
+	);
 	return system_settings_form($form);
 }
 function controlm_fetch_extract_form_validate ($form, &$form_state) {
@@ -80,6 +98,8 @@ function _controlm_fetch_extract_main() {
         $username = variable_get('controlm_em_username', '');
         $identity = variable_get('controlm_identity_file', '');
         $known_hosts = variable_get('controlm_known_hosts_file', '');
+	$app_user = variable_get('controlm_fetch_extract_username','');
+	$app_pass = variable_get('controlm_fetch_extract_password','');
 
 	$db_type = variable_get('controlm_em_db_type',array());
         switch($db_type) {
@@ -111,7 +131,7 @@ function _controlm_fetch_extract_main() {
         $cmds = array(
 		'ssh -i '.$identity.' -o UserKnownHostsFile='.$known_hosts.' '.$username.'@'.$hostname.' "whoami" 2>&1',
 		'scp -i '.$identity.' -o UserKnownHostsFile='.$known_hosts.' '.$extract_settings_file.' '.$username.'@'.$hostname.':'.$remote_extract_settings_file.' 2>&1',
-		'ssh -i '.$identity.' -o UserKnownHostsFile='.$known_hosts.' '.$username.'@'.$hostname.' "exportdeftable -u '.$remote_db_user.' -p '.$remote_db_pass.' -s '.$remote_db_host.' -arg '.$remote_extract_settings_file.' -out '.$remote_extract_file.' 2>&1" 2>&1',
+		'ssh -i '.$identity.' -o UserKnownHostsFile='.$known_hosts.' '.$username.'@'.$hostname.' "exportdeftable -u '.$app_user.' -p '.$app_pass.' -s '.$remote_db_host.' -arg '.$remote_extract_settings_file.' -out '.$remote_extract_file.' 2>&1" 2>&1',
 		'scp -i '.$identity.' -o UserKnownHostsFile='.$known_hosts.' '.$username.'@'.$hostname.':'.$remote_extract_file.' '.$extract_file.' 2>&1',
 	);
 	foreach($cmds as $cmd) {
@@ -134,7 +154,7 @@ function _controlm_fetch_extract_main() {
 	unset($contents);
 
 	foreach($dbTables as $tbl) {
-		$return .= "Done<br />Truncating table ".$tbl."...";
+		$return .= "Truncating table ".$tbl."...";
 		db_truncate($tbl)->execute();
 		$return .= "Done<br />";
 	}
@@ -152,9 +172,19 @@ function _controlm_fetch_extract_main() {
 	foreach($sched_tables as $table) {
 		foreach($table['@attributes'] as $k => $v) {
 			if($k == "LAST_UPLOAD") $v = date('Y-m-d H:i:s',strtotime($v));
+			switch($k) {
+				case "LAST_UPLOAD":
+					$v = date('Y-m-d H:i:s',strtotime($v));
+					break;
+				case "TABLE_NAME":
+					$k = "FOLDER_NAME";
+					break;
+//				case "TABLE_USERDAILY":
+//					continue 2;
+			}
 			$att['CMT_'.$k] = $v;
 		}
-		$return .= "Inserting schedule table ".$table['@attributes'][$name_field]." into cm_sched_table...";
+		$return .= "Inserting schedule table ".htmlspecialchars($table['@attributes'][$name_field])." into cm_sched_table...";
 		$tblInsId = db_insert('cm_sched_table')->fields($att)->execute();
 		$return .= "Done<br />";
 		unset($att);
@@ -165,7 +195,7 @@ function _controlm_fetch_extract_main() {
 				$att['CMJI_'.$k] = trim($v);
 			}
 			$att['CMJI_TABLE_ID'] = $tblInsId;
-			$return .= "&nbsp;&nbsp;Inserting job ".$job['@attributes']['JOBNAME']." into cm_job_info...";
+			$return .= "&rdsh;Inserting job ".htmlspecialchars($job['@attributes']['JOBNAME'])." into cm_job_info...";
 			$jobInsId = db_insert('cm_job_info')->fields($att)->execute();
 			$return .= "Done<br />";
 			unset($att);
@@ -197,7 +227,7 @@ function cmInsertJobProperty($attributes,$property,$jobInsId,&$known_attr,&$know
 			$typeInsId = db_insert('cm_prop_types')->fields($data)->execute();
 			$known_attr[$property][$k]['id'] = $typeInsId;
 		}
-		$return .= "&nbsp;&nbsp;&nbsp;&nbsp;Inserting job property ".$property."/".$k."/".$v." into cm_job_properties...";
+		$return .= "&mid;&nbsp;&rdsh;Inserting job property ".htmlspecialchars($property)."/".$k."/".$v." into cm_job_properties...";
 		$data = array(
 			'CMJP_JOB_ID' => $jobInsId,
 			'CMJP_TYPE' => $typeInsId,
@@ -231,7 +261,7 @@ function cmInsertOnProperty($attributes,$onKey,$jobInsId,$typeInsId,&$known_attr
 				$onInsId = db_insert('cm_on_types')->fields($data)->execute();
 				$known_attr_on[$onKey][$k]['id'] = $onInsId;
 			}
-			$return .= "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Inserting job ON property ".$onKey."/".$k."/".$v." into cm_job_on_properties...";
+			$return .= "&mid;&nbsp;&mid;&nbsp;&rdsh;Inserting job ON property ".htmlspecialchars($onKey)."/".$k."/".$v." into cm_job_on_properties...";
 			$data = array(
 				'CMJOP_JOB_ID' => $jobInsId,
 				'CMJOP_PROP_TYPE' => $typeInsId,

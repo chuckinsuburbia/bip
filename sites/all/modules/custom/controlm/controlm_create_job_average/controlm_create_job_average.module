@@ -67,18 +67,13 @@ function cmCreateJobAvg() {
 	//ini_set('memory_limit','1G');
 	ini_set('max_execution_time',0);
 
-	db_set_active('bip');
-
 	$return = "";
 
 	$tbl = "cm_job_average";
-	$return .= "Backing up DB table ".$tbl."...";
-	dbTblBackup($tbl);
-	$return .= "Done<br />";
 
-	$return .= "<br />Emptying DB table ".$tbl."...";
+	//$return .= "<br />Emptying DB table ".$tbl."...";
 	//dbTblEmpty($tbl);
-	$return .= "Done<br />";
+	//$return .= "Done<br />";
 
 	$return .= "<br />Collecting Data on jobs run...";
 	$query = db_select('cm_jobs_run','cjr');
@@ -107,11 +102,10 @@ function cmCreateJobAvg() {
 			'cmja_max' => $record['cmja_max'],
 		));
 		$merge->execute();
-		usleep(100); //Sleep for 100 microseconds so other queries don't get jammed up
+		usleep(10); //Sleep for 10 microseconds so other queries don't get jammed up
 	}
 	$return .= "Done<br />";
 	
-	db_set_active();
 	return($return);
 }
 

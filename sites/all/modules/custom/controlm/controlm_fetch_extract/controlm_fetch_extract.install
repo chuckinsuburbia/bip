@@ -562,39 +562,30 @@ function controlm_fetch_extract_schema() {
 				'length' => 44,
 			),
 */
-/*
 			'cmt_table_userdaily' => array(
                                 'type' => 'varchar',
 				'length' => 10,
 			),
-*/
-/*
 			'cmt_used_by' => array(
                                 'type' => 'varchar',
 				'length' => 40,
 			),
-*/
 			'cmt_used_by_code' => array(
                                 'type' => 'int',
 			),
-/*
 			'cmt_modified' => array(
                                 'type' => 'char',
 				'length' => 1,
 			),
-*/
                         'cmt_last_upload' => array(
                                 'type' => 'datetime',
 				'mysql_type' => 'datetime',
 				'pgsql_type' => 'timestamp',
-                                'not null' => true,
                         ),
-/*
 			'cmt_checksum' => array(
                                 'type' => 'varchar',
 				'length' => 40,
 			),
-*/
 /*
 			'cmt_table_id' => array(
                                 'type' => 'int',

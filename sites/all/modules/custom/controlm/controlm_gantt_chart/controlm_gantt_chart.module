@@ -16,7 +16,6 @@ function controlm_gantt_chart_execute() {
 	return array('#markup' => '<p>' . t($markup) . '</p>');
 }
 function controlm_gantt_chart_form ($form, &$form_state) {
-	db_set_active('bip');
 	$app_options = array('' => '');
 	$grp_options = array('' => '');
 	//Get Application List
@@ -31,8 +30,6 @@ function controlm_gantt_chart_form ($form, &$form_state) {
 	while($record = $result->fetchAssoc()) {
 		$grp_options[$record['cmji_group']] = $record['cmji_group'];
 	}
-
-	db_set_active();
 
 	$form = array();
 	$form['group1'] = array(
@@ -101,7 +98,6 @@ function controlm_gantt_chart_form_submit ($form, &$form_state) {
 		$where['cmji_group'] = $form_state['values']['group'];
 	}
 
-	db_set_active('bip');
 	$query = db_select('cm_jobs_run','cjr');
 	$query->leftJoin('cm_job_info','cji',"cmjr_job_name =cmji_jobname AND cmjr_node_id LIKE concat( left( cmji_nodeid, 12 ) , '%' )");
 	$query->fields('cjr',array('cmjr_job_name','cmjr_node_id','cmjr_elapsed_time'));
@@ -177,7 +173,6 @@ EOF;
 	$form_state['storage']['results'] = $markup;
         $form_state['rebuild'] = TRUE;
 
-	db_set_active();
 	return $markup;
 }
 

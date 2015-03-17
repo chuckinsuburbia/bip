@@ -93,9 +93,7 @@ function controlm_view_job_list_form_submit ($form, &$form_state) {
 	}
 	
 	//Get images for each job status - stored as image nodes in Drupal
-	db_set_active('bip');
 	$result = db_select('cm_job_status','cmjs')->distinct()->fields('cmjs',array('cmjs_status'))->execute();
-	db_set_active();
 
 	while($status = $result->fetchField()) {
 		$query = new EntityFieldQuery();
@@ -127,7 +125,6 @@ function controlm_view_job_list_form_submit ($form, &$form_state) {
 		$where[$k] = $v;
 	}
 
-	db_set_active('bip');
 	$query = db_select('cm_job_info','cmji');
 	$query->leftJoin('cm_job_status','cmjs','cmji.cmji_jobname = cmjs.cmjs_job_name AND cmji.cmji_nodeid = cmjs.cmjs_cpu_id');
 	$query->leftJoin('cm_job_properties','cmjp','cmji.cmji_id = cmjp.cmjp_job_id');
@@ -141,7 +138,6 @@ function controlm_view_job_list_form_submit ($form, &$form_state) {
 	$query->orderBy($form_state['values']['orderby']);
 	$query->distinct();
 	$result = $query->execute();
-	db_set_active();
 	
 	while($record = $result->fetchAssoc()) {
 
@@ -251,7 +247,6 @@ function controlm_view_job_list_form_submit ($form, &$form_state) {
 	$form_state['storage']['results'] = $table;
 	$form_state['rebuild'] = TRUE;
 
-	db_set_active();
 	return $table;
 }
 

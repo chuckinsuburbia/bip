@@ -13,23 +13,41 @@ function controlm_view_trending_menu () {
 function controlm_view_trending_execute() {
 	$markup = "";
 
-	db_set_active('bip');
+	//Set up render array
+        $table = array(
+                '#theme' => 'table',
+                '#header' => array(t('Job Name'),t('Node'),t('Description'),t('Trend'),t('Last Run'),t('Last Time'),t('Average'),t('Doc'),t('Info'),t('Chart')),
+                '#rows' => array(),
+        );
 
 	$query = db_select('cm_job_trend','cjt');
 	$query->leftJoin('cm_job_average','cja','cjt.cmjt_job_name = cja.cmja_job_name AND cjt.cmjt_node_id = cja.cmja_node_id');
-	$query->fields('cjt')->addField('cja','CMJA_AVERAGE');
+	$query->leftJoin('cm_job_info','cji','cjt.cmjt_job_name = cji.cmji_jobname AND cjt.cmjt_node_id = cji.cmji_nodeid');
+	$query->fields('cjt')->addField('cja','cmja_average');
+	$query->addField('cji','cmji_description');
 	$query->condition('cmjt_alarm','','<>');
 	$query->where('DATE_SUB(CURDATE(),INTERVAL 60 DAY) <= cmjt_last_run');
 	$query->condition('cmja_dow',date('N'),'=');
-	$query->orderBy('cmjt_alarm','ASC')->orderBy('cmjt_job_name','ASC');
+	$query->orderBy('cmjt_alarm','DESC')->orderBy('cmjt_job_name','ASC')->orderBy('cmjt_node_id','ASC');
 	$result = $query->execute();
 
 	while($record = $result->fetchAssoc()) {
-		$trend_jobs[$record['CMJT_JOB_NAME']] = $record;
+		$avg = isset($record['cmja_average']) ? gmdate('H:i:s',$record['cmja_average']) : "N/A";
+		$table['#rows'][] = array(
+			t($record['cmjt_job_name']),
+			t($record['cmjt_node_id']),
+			t($record['cmji_description']),
+			$record['cmjt_alarm'],
+			date('Y/m/d H:i:s',strtotime($record['cmjt_last_run'])),
+			gmdate('H:i:s',$record['cmjt_last_time']),
+			$avg,
+			
+		);
+		$trend_jobs[$record['cmjt_job_name']] = $record;
 	}
-	$markup .= "<pre>".print_r($trend_jobs,TRUE)."</pre>";
 
-	db_set_active();
+	$markup .= theme('table',$table);
+		
 	return array('#markup' => '<p>' . t($markup) . '</p>');
 }
 
