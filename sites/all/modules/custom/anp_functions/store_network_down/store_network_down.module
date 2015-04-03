@@ -161,6 +161,8 @@ function store_network_down_execute() {
 		$hostdown['#prefix'] = "<h2>Store Communication Completely Down</h2><p>";
 		$hostdown['#suffix'] = "</p>";
 		$markup['content'][] = $hostdown;
+	} else {
+		$markup['content'][]['#markup'] = "<h2>No sites have communication completely down.</h2>";
 	}
 
 	//Primary Down
@@ -201,6 +203,8 @@ function store_network_down_execute() {
 		$pridown['#prefix'] = "<h2>XO Data/Voice Circuit Down</h2><p>";
 		$pridown['#suffix'] = "</p>";
 		$markup['content'][] = $pridown;
+	} else {
+		$markup['content'][]['#markup'] = "<h2>No sites have XO Data/Voice Circuit Down.</h2>";
 	}
 
 	//Backup Down
@@ -241,6 +245,8 @@ function store_network_down_execute() {
 		$secdown['#prefix'] = "<h2>Alternate Data Circuit or Backup Down</h2><p>";
 		$secdown['#suffix'] = "</p>";
 		$markup['content'][] = $secdown;
+	} else {
+		$markup['content'][]['#markup'] = "<h2>No sites have Alternate Data Circuit or Backup Down.</h2>";
 	}
 	
 

@@ -73,89 +73,83 @@ function cmGetRuntime() {
 	$start = variable_get('controlm_fetch_runtimes_last_execution', date('YmdHis',time() - 86400));
 	$return .= "<p>Start time: ".$start."<br />End time: ".$end."</p>";
 
-	$hostname = variable_get('controlm_hostname', '');
-	$username = variable_get('controlm_username', '');
-	$identity = variable_get('controlm_identity_file', '');
-	$known_hosts = variable_get('controlm_known_hosts_file', '');
+	$db_type = variable_get('controlm_em_db_type',array());
+        switch($db_type) {
+                case 'standard':
+                        global $databases;
+                        if(!isset($databases['ctmem'])) {
+                                drupal_set_message('There must be a database defined for "ctmem"','error');
+                                return;
+                        }
+                        db_set_active('ctmem');
+                        $jobs = db_select('cmr_runinf','r')
+                                ->fields('r')
+				->condition('TIMESTMP',$start,'>=')
+                                ->execute();
+                        while($job = $jobs->fetchAssoc()) {
+				$return .= _controlm_fetch_runtimes_local_db_insert($job);
+                        }
+                        db_set_active();
+                        break;
+                case 'oci8':
+                        $oci8 = variable_get('oci8',array());
+                        if(!isset($oci8['databases']['ctmem'])) {
+                                drupal_set_message('There must be an OCI8 database defined for "ctmem"','error');
+                                return;
+                        }
+                        oci8_db_set_active('ctmem');
 
-	$cmd = 'ssh -i '.$identity.' -o UserKnownHostsFile='.$known_hosts.' '.$username.'@'.$hostname.' "ctmruninf -list '.$start.' '.$end.' | tail -n +3"';
-	exec($cmd,$output,$rc);
-//	$return .= "<pre>".print_r($output,TRUE)."</pre>";
-	if($rc !== 0) {
-		drupal_set_message('Command returned error '.$rc.': '.$cmd,'error');
-		dsm($output);
-		return;
-	}
+                        $sql = "BEGIN EMUSER.BIP_PERMISSIONS.GRANT_SELECT_TABLE; END;";
+                        oci8_db_query($sql)->execute();
 
-	foreach($output as $line) {
-		if(substr($line,0,1) == "2") {
-			$line = rtrim($line);
-			$vars = preg_split("/[ ]+/",$line);
-			$timestamp = substr($vars[0],0,4)."-".substr($vars[0],4,2)."-".substr($vars[0],6,2)." ".substr($vars[0],8,2).":".substr($vars[0],10,2).":".substr($vars[0],12,2);
-			if(count($vars) == 8) {
-				$memlib = "";
-				$cpu = $vars[6];
-				$elapsed = $vars[7];
-				$error=false;
-			} elseif(count($vars) != 9) {
-				$vars[0] = rtrim(substr($line,0,15));
-				$vars[1] = rtrim(substr($line,15,11));
-				$vars[2] = rtrim(substr($line,26,12));
-				$vars[3] = rtrim(substr($line,38,2));
-				$vars[4] = rtrim(substr($line,40,13));
-				$vars[5] = rtrim(substr($line,53,13));
-				$vars[6] = rtrim(substr($line,66,21));
-				$vars[7] = rtrim(substr($line,87,9));
-				$vars[8] = rtrim(substr($line,96));
-				$memlib = $vars[6];
-				$cpu = $vars[7];
-				$elapsed = $vars[8];
-				$error=false;
-				for ($i=0;$i<7;$i++) {
-					if(strlen($vars[$i]) > 0 && substr($vars[$i],0,1) == " ") {
-						$return .= "Could not decode line, var".$i."(".$vars[$i]."):<br />".$line."<br />";
-						watchdog('controlm_fetch_runtimes',"Could not decode line, var".$i."(".$vars[$i]."):<br />".$line."<br />");
-						$error=true;
-					}
-				}
-			} else {
-				$memlib = $vars[6];
-				$cpu = $vars[7];
-				$elapsed = $vars[8];
-				$error=false;
-			}
-
-			if(!$error) {
-				$keys = array(
-					'CMJR_TIMESTAMP' => $timestamp,
-					'CMJR_JOB_NAME' => $vars[1],
-					'CMJR_ORDER_ID' => substr($vars[2],0,8),
-					'CMJR_RUN' => $vars[3],
-					'CMJR_NODE_ID' => $vars[4],
-				);
-				$fields = array(
-					'CMJR_MEM_NAME' => $vars[5],
-					'CMJR_MEM_LIB' => $memlib,
-					'CMJR_CPU' => $cpu,
-					'CMJR_ELAPSED_TIME' => $elapsed,
-				);
-				$return .= "Job ".$vars[1].", order ID ".$vars[2].": ";
-				$write_stat = db_merge('cm_jobs_run')->key($keys)->fields($fields)->execute();
-				switch($write_stat) {
-					case 1:
-						$return .= "Inserted.<br />";
-						break;
-					case 2:
-						$return .= "Updated.<br />";
-						break;
-					default:
-						$return .= "Unexpected Result.<br />";
-				}
-			}
-		}
-	}
+                        $sql = "SELECT * FROM CTMUSER.CMR_RUNINF WHERE TIMESTMP >= ".$start;
+                        $job_query = oci8_db_query($sql);
+                        $job_query->execute();
+                        while($job = $job_query->fetchAssoc()) {
+				$return .= _controlm_fetch_runtimes_local_db_insert($job);
+                        }
+                        break;
+                default:
+                        drupal_set_message('Unknown DB driver '.$db_type.'.','error');
+                        return;
+        }
 
 	variable_set('controlm_fetch_runtimes_last_execution', $end);
+	return($return);
+}
+
+function _controlm_fetch_runtimes_local_db_insert($job) {
+	$return = "";
+	$lc_job = array_change_key_case($job,CASE_LOWER);
+
+	$timestamp = date('Y-m-d H:i:s',strtotime($lc_job['timestmp']));
+	$orderid = str_pad(base_convert($lc_job['orderno'],10,36),6,'0',STR_PAD_LEFT);
+
+	$keys = array(
+		'CMJR_TIMESTAMP' => $timestamp,
+		'CMJR_JOB_NAME' => $lc_job['jobname'],
+		'CMJR_ORDER_ID' => $orderid,
+		'CMJR_RUN' => $lc_job['runcount'],
+		'CMJR_NODE_ID' => $lc_job['nodeid'],
+	);
+	$fields = array(
+		'CMJR_MEM_NAME' => $lc_job['memname'],
+		'CMJR_MEM_LIB' => $lc_job['memlib'],
+		'CMJR_CPU' => $lc_job['cputime'],
+		'CMJR_ELAPSED_TIME' => $lc_job['elaptime'],
+	);
+	$return .= "Job ".$lc_job['jobname'].", order ID ".$orderid.": ";
+	$write_stat = db_merge('cm_jobs_run')->key($keys)->fields($fields)->execute();
+	switch($write_stat) {
+		case 1:
+			$return .= "Inserted.<br />";
+			break;
+		case 2:
+			$return .= "Updated.<br />";
+			break;
+		default:
+			$return .= "Unexpected Result.<br />";
+	}
 	return($return);
 }
 

@@ -1,0 +1,107 @@
+<?php
+
+function controlm_unavailable_agents_menu () {
+	$items = array();
+	$items['controlm/unavailable_agents'] = array(
+		'title' => 'Unavailable Agents',
+		'page callback' => 'controlm_unavailable_agents_page',
+		'access arguments' => array('access controlm content'),
+		'type' => MENU_NORMAL_ITEM,
+	);
+	$items['ajax/controlm/unavailable_agents/pleasewait'] = array(
+                'page callback' => 'controlm_unavailable_agents_pleasewait_get_ajax',
+                'delivery callback' => 'controlm_unavailable_agents_pleasewait_ajax_callback',
+                'access arguments' => array('access controlm content'),
+                'type' => MENU_CALLBACK,
+        );
+	$items['ajax/controlm/unavailable_agents/execute'] = array(
+                'page callback' => 'controlm_unavailable_agents_execute_get_ajax',
+                'delivery callback' => 'controlm_unavailable_agents_execute_ajax_callback',
+                'access arguments' => array('access controlm content'),
+                'type' => MENU_CALLBACK,
+        );
+	return $items;
+}
+/*
+function controlm_unavailable_agents_execute() {
+  return array('#markup' => '<p>' . t(cmPurgeDB()) . '</p>');
+}
+*/
+
+function controlm_unavailable_agents_page() {
+        drupal_add_library('system', 'drupal.ajax');
+
+        $markup = "";
+
+        $markup .= <<<EOM
+<code><div id="ajax-target-command-status"></div></code>
+<div id="ajax-target-output">Please wait one moment...</div>
+<script>
+        function controlm_unavailable_agents_output_ajax_load() {
+                jQuery("#ajax-target-output").load("/ajax/controlm/unavailable_agents/pleasewait");
+                jQuery("#ajax-target-output").load("/ajax/controlm/unavailable_agents/execute");
+        }
+        jQuery(document).ready(function($){controlm_unavailable_agents_output_ajax_load();});
+</script>
+EOM;
+
+        return(array('#markup' => t($markup)));
+}
+
+function controlm_unavailable_agents_pleasewait_get_ajax() {
+        $return = "Please wait one moment...<br /><img src='".file_create_url('public://preloader.gif')."' width='50px' />";
+
+        return $return;
+}
+function controlm_unavailable_agents_pleasewait_ajax_callback($page_callback_result) {
+        echo($page_callback_result);
+}
+
+function controlm_unavailable_agents_execute_get_ajax() {
+	ini_set('memory_limit','1G');
+	ini_set('max_execution_time',0);
+
+	$return = "";
+
+	//Set up render array
+        $table = array(
+                '#theme' => 'table',
+                '#header' => array(t('Host Name'),t('Agent Status'),t('Ping Status')),
+                '#rows' => array(),
+        );
+
+	$hostname = variable_get('controlm_hostname', '');
+        $username = variable_get('controlm_username', '');
+        $identity = variable_get('controlm_identity_file', '');
+        $known_hosts = variable_get('controlm_known_hosts_file', '');
+
+	$cmd = 'ssh -i '.$identity.' -o UserKnownHostsFile='.$known_hosts.' '.$username.'@'.$hostname.' "ctm_agstat -LIST \"*\" | grep Unavailable"';
+	exec($cmd,$output,$rc);
+//	$return .= "<pre>".print_r($psm_output,TRUE)."</pre>";
+	if($rc !== 0) {
+		drupal_set_message('Command returned error '.$rc.': '.$cmd,'error');
+		dsm($output);
+		return;
+	}
+
+	foreach($output as $line) {
+		$fields = explode(' ',$line);
+		$host = $fields[1];
+		$agstat = $fields [3];
+
+		$cmd = 'ping -c 1 -W 1 '.$host.' 2>&1';
+		exec($cmd,$ping_output,$rc);
+		$ping_output = array_filter($ping_output);
+		$ping_stat = array_pop($ping_output);
+
+		$table['#rows'][] = array($host,$agstat,$ping_stat);
+	}
+
+	$return .= theme('table',$table);
+	
+	return($return);
+}
+function controlm_unavailable_agents_execute_ajax_callback($page_callback_result) {
+        echo($page_callback_result);
+}
+

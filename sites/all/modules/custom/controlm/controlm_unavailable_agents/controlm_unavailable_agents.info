@@ -1,0 +1,7 @@
+name = Control-M Unavailable Agents
+description = This module contains functions to display Control-M agents that are unavailable"
+core = 7.x
+package = "control-m"
+dependencies[] = controlm_base
+
+version = "7.x-X.X"
