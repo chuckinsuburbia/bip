@@ -135,8 +135,8 @@ function _controlm_fetch_runtimes_local_db_insert($job) {
 	$fields = array(
 		'CMJR_MEM_NAME' => $lc_job['memname'],
 		'CMJR_MEM_LIB' => $lc_job['memlib'],
-		'CMJR_CPU' => $lc_job['cputime'],
-		'CMJR_ELAPSED_TIME' => $lc_job['elaptime'],
+		'CMJR_CPU' => $lc_job['cputime'] / 100,
+		'CMJR_ELAPSED_TIME' => $lc_job['elaptime'] / 100,
 	);
 	$return .= "Job ".$lc_job['jobname'].", order ID ".$orderid.": ";
 	$write_stat = db_merge('cm_jobs_run')->key($keys)->fields($fields)->execute();
