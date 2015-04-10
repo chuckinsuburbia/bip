@@ -1,9 +1,0 @@
-name = Oracle Fetch Size
-description = This module fetches segment sizes from defined oracle databases
-core = 7.x
-package = "oracle"
-configure = admin/config/services/oracle/fetch_size
-dependencies[] = oracle_base
-dependencies[] = oci8
-
-version = "7.x-X.X"
