@@ -134,6 +134,7 @@ function _controlm_fetch_extract_main() {
 		'ssh -i '.$identity.' -o UserKnownHostsFile='.$known_hosts.' '.$username.'@'.$hostname.' "exportdeftable -u '.$app_user.' -p '.$app_pass.' -s '.$remote_db_host.' -arg '.$remote_extract_settings_file.' -out '.$remote_extract_file.' 2>&1" 2>&1',
 		'scp -i '.$identity.' -o UserKnownHostsFile='.$known_hosts.' '.$username.'@'.$hostname.':'.$remote_extract_file.' '.$extract_file.' 2>&1',
 	);
+/*
 	foreach($cmds as $cmd) {
 		$output = "";
 	        exec($cmd,$output,$rc);
@@ -144,12 +145,12 @@ function _controlm_fetch_extract_main() {
 			return;
 		}
 	}
-
+*/
 
 	$contents = file_get_contents($extract_file);
 	$ctmExportXML = simplexml_load_string($contents, 'SimpleXMLElement', LIBXML_COMPACT | LIBXML_PARSEHUGE);
 	$ctmExport = object_to_array($ctmExportXML);
-//	$return .= "<pre>".print_r($contents,TRUE)."</pre>";
+//	$return .= "<pre>".print_r($ctmExport,TRUE)."</pre>";
 //	return($return);
 	unset($contents);
 
@@ -159,35 +160,77 @@ function _controlm_fetch_extract_main() {
 		$return .= "Done<br />";
 	}
 
-	if(isset($ctmExport['SCHED_TABLE'])) {
-		$sched_tables = $ctmExport['SCHED_TABLE'];
-		$name_field = "TABLE_NAME";
-	} elseif(isset($ctmExport['FOLDER'])) {
-		$sched_tables = $ctmExport['FOLDER'];
-		$name_field = "FOLDER_NAME";
-	} else {
-		drupal_set_message("Unable to find schedule tables in extract!",'error');
-		return;
+	if(isset($ctmExport['SMART_FOLDER'])) {
+		$return .= _controlm_fetch_extract_insert_smart_folder($ctmExport['SMART_FOLDER'],"FOLDER_NAME");
 	}
-	foreach($sched_tables as $table) {
-		foreach($table['@attributes'] as $k => $v) {
-			if($k == "LAST_UPLOAD") $v = date('Y-m-d H:i:s',strtotime($v));
-			switch($k) {
-				case "LAST_UPLOAD":
-					$v = date('Y-m-d H:i:s',strtotime($v));
-					break;
-				case "TABLE_NAME":
-					$k = "FOLDER_NAME";
-					break;
-//				case "TABLE_USERDAILY":
-//					continue 2;
-			}
-			$att['CMT_'.$k] = $v;
+	if(isset($ctmExport['SCHED_TABLE'])) {
+		$return .= _controlm_fetch_extract_insert_tables($ctmExport['SCHED_TABLE'],"TABLE_NAME");
+	}
+	if(isset($ctmExport['FOLDER'])) {
+		$return .= _controlm_fetch_extract_insert_tables($ctmExport['FOLDER'],"FOLDER_NAME");
+	}
+
+	return($return);
+}
+
+function _controlm_fetch_extract_insert_smart_folder($folder,$name_field) {
+//	return("<pre>".print_r($folder,TRUE)."</pre>");
+
+	if(isset($folder[0])) {
+		foreach($folder as $subfolder) {
+			$fields[]['@attributes'] = array(
+				'DATACENTER' => $subfolder['@attributes']['DATACENTER'],
+				$name_field => $subfolder['@attributes'][$name_field],
+				'USED_BY_CODE' => $subfolder['@attributes']['USED_BY_CODE'],
+				'LAST_UPLOAD' => $subfolder['@attributes']['LAST_UPLOAD'],
+				'REAL_FOLDER_ID' => $subfolder['@attributes']['REAL_FOLDER_ID'],
+				'PLATFORM' => $subfolder['@attributes']['PLATFORM'],
+				'TYPE' => $subfolder['@attributes']['TYPE'],
+				'VERSION' => $subfolder['@attributes']['VERSION'],
+				'FOLDER_ORDER_METHOD' => $subfolder['@attributes']['FOLDER_ORDER_METHOD'],	
+			);
+			$fields[]['JOB'] = $subfolder['JOB'];
 		}
-		$return .= "Inserting schedule table ".htmlspecialchars($table['@attributes'][$name_field])." into cm_sched_table...";
-		$tblInsId = db_insert('cm_sched_table')->fields($att)->execute();
-		$return .= "Done<br />";
-		unset($att);
+	} else {
+		$fields[0]['@attributes'] = array(
+			'DATACENTER' => $folder['@attributes']['DATACENTER'],
+			$name_field => $folder['@attributes'][$name_field],
+			'USED_BY_CODE' => $folder['@attributes']['USED_BY_CODE'],
+			'LAST_UPLOAD' => $folder['@attributes']['LAST_UPLOAD'],
+			'REAL_FOLDER_ID' => $folder['@attributes']['REAL_FOLDER_ID'],
+			'PLATFORM' => $folder['@attributes']['PLATFORM'],
+			'TYPE' => $folder['@attributes']['TYPE'],
+			'VERSION' => $folder['@attributes']['VERSION'],
+			'FOLDER_ORDER_METHOD' => $folder['@attributes']['FOLDER_ORDER_METHOD'],	
+		);
+		$fields[0]['JOB'] = $folder['JOB'];
+	}
+	return(_controlm_fetch_extract_insert_tables($fields,$name_field));
+}
+
+function _controlm_fetch_extract_insert_tables($sched_tables,$name_field) {
+	$return = "";
+	foreach($sched_tables as $table) {
+		if(isset($table['@attributes'])) {
+			foreach($table['@attributes'] as $k => $v) {
+				if($k == "LAST_UPLOAD") $v = date('Y-m-d H:i:s',strtotime($v));
+				switch($k) {
+					case "LAST_UPLOAD":
+						$v = date('Y-m-d H:i:s',strtotime($v));
+						break;
+					case "TABLE_NAME":
+						$k = "FOLDER_NAME";
+						break;
+				}
+				$att['CMT_'.$k] = $v;
+			}
+			$return .= "Inserting schedule table ".htmlspecialchars($table['@attributes'][$name_field])." into cm_sched_table...";
+			$tblInsId = db_insert('cm_sched_table')->fields($att)->execute();
+			$return .= "Done<br />";
+			unset($att);
+		} else {
+			dsm($table);
+		}
 
 		foreach($table['JOB'] as $job) {
 			if(!isset($job['@attributes']) || !isset($job['@attributes']['JOBNAME'])) continue;
