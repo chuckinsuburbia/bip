@@ -134,7 +134,6 @@ function _controlm_fetch_extract_main() {
 		'ssh -i '.$identity.' -o UserKnownHostsFile='.$known_hosts.' '.$username.'@'.$hostname.' "exportdeftable -u '.$app_user.' -p '.$app_pass.' -s '.$remote_db_host.' -arg '.$remote_extract_settings_file.' -out '.$remote_extract_file.' 2>&1" 2>&1',
 		'scp -i '.$identity.' -o UserKnownHostsFile='.$known_hosts.' '.$username.'@'.$hostname.':'.$remote_extract_file.' '.$extract_file.' 2>&1',
 	);
-/*
 	foreach($cmds as $cmd) {
 		$output = "";
 	        exec($cmd,$output,$rc);
@@ -145,7 +144,6 @@ function _controlm_fetch_extract_main() {
 			return;
 		}
 	}
-*/
 
 	$contents = file_get_contents($extract_file);
 	$ctmExportXML = simplexml_load_string($contents, 'SimpleXMLElement', LIBXML_COMPACT | LIBXML_PARSEHUGE);
