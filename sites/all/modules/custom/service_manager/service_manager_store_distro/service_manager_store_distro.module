@@ -189,14 +189,10 @@ function service_manager_store_distro_form($form, &$form_state) {
 
 function service_manager_store_distro_form_submit($form, &$form_state) {
 	$results = "";
-	$ous = array(
-		'dc=corp,dc=gaptea,dc=com',
-		'dc=store,dc=gaptea,dc=com',
-	);
 	$err = array();
 
 	if ($ldap_servers = ldap_servers_get_servers(NULL, 'enabled')) {
-		$ldap_server = current($ldap_servers);
+//		$results .= "<pre>".print_r($ldap_servers,TRUE)."</pre>";
 		
 		foreach($form_state['values']['ldap_lookups'] as $k => $v) {
 			if($form_state['input'][$k] == 1) {
@@ -213,12 +209,15 @@ function service_manager_store_distro_form_submit($form, &$form_state) {
 			if(isset($ldap_lookups)) {
 				foreach($ldap_lookups as $lookup) {
 					$found = FALSE;
-					foreach($ous as $ou) {
-						if ($ldap_results = $ldap_server->search($ou, 'SAMAccountName='.$store.$lookup)) {
-//							$results .= "<pre>".print_r($ldap_results,TRUE)."</pre>";
-							if($ldap_results['count'] == 1 && isset($ldap_results[0]['mail'][0])) {
-								$mailto[] = $ldap_results[0]['mail'][0];
-								$found = TRUE;
+					foreach($ldap_servers as $ldap_server) {
+						foreach($ldap_server->basedn as $ou) {
+							if ($ldap_results = $ldap_server->search($ou, 'SAMAccountName='.$store.$lookup)) {
+								$results .= $ldap_server->name."<pre>".print_r($ldap_results,TRUE)."</pre>";
+								if($ldap_results['count'] == 1 && isset($ldap_results[0]['mail'][0])) {
+									$mailto[] = $ldap_results[0]['mail'][0];
+									$found = TRUE;
+									break;
+								}
 							}
 						}
 					}
@@ -231,12 +230,15 @@ function service_manager_store_distro_form_submit($form, &$form_state) {
 						$name = trim($form_state['values']['storelist'][$store][$lookup]);
 						if(is_null($name) || $name == '') continue;
 						$found = FALSE;
-						foreach($ous as $ou) {
-							if ($ldap_results = $ldap_server->search($ou, 'SAMAccountName='.$name)) {
-//								$results .= "<pre>".print_r($ldap_results,TRUE)."</pre>";
-								if($ldap_results['count'] == 1 && isset($ldap_results[0]['mail'][0])) {
-									$mailto[] = $ldap_results[0]['mail'][0];
-									$found = TRUE;
+						foreach($ldap_servers as $ldap_server) {
+							foreach($ldap_server->basedn as $ou) {
+								if ($ldap_results = $ldap_server->search($ou, 'SAMAccountName='.$name)) {
+									$results .= $ldap_server->name."<pre>".print_r($ldap_results,TRUE)."</pre>";
+									if($ldap_results['count'] == 1 && isset($ldap_results[0]['mail'][0])) {
+										$mailto[] = $ldap_results[0]['mail'][0];
+										$found = TRUE;
+										break;
+									}
 								}
 							}
 						}
@@ -251,11 +253,15 @@ function service_manager_store_distro_form_submit($form, &$form_state) {
 
 //	$results .= "<pre>".print_r($form_state,TRUE)."</pre>";
 
-	sort($mailto);
-	$results .= implode('; ',array_unique($mailto));
+	if(isset($mailto)) {
+		sort($mailto);
+		$results .= implode('; ',array_unique($mailto));
+	}
 
-	sort($err);
-	$results .= "<br /><br />".implode('<br />',array_unique($err));
+	if(!empty($err)) {
+		sort($err);
+		$results .= "<br /><br />".implode('<br />',array_unique($err));
+	}
 
 	$form_state['storage']['results']['#markup'] = $results;
 	$form_state['rebuild'] = TRUE;
