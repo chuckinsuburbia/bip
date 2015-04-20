@@ -1,0 +1,277 @@
+<?php
+
+function service_manager_view_incident_menu () {
+	$items['service_manager/view_incident/%'] = array(
+		'title' => 'View Incident',
+		'page callback' => 'service_manager_view_incident_page',
+		'page arguments' => array(2),
+		'access arguments' => array('access service_manager content'),
+		'type' => MENU_NORMAL_ITEM,
+	);
+	return($items);
+}
+
+function service_manager_view_incident_page($im) {
+	$sc = variable_get('service_manager_incident_wsdl_client_url', '');
+	$sc_user = variable_get('service_manager_username','');
+	$sc_pass = variable_get('service_manager_password','');
+
+	$cache = new nusoap_wsdlcache('/tmp', 86400);
+        $wsdl = $cache->get($sc);
+        if(is_null($wsdl)) {
+                $wsdl = new wsdl($sc, '', '', '', '', 5);
+                $cache->put($wsdl);
+        }
+
+        $client = new nusoap_client($wsdl, 'wsdl', false, false, false, false, 0, 600);
+        $err = $client->getError();
+        if ($err) {
+                return('<h2>Constructor error</h2><pre>' . $err . '</pre>');
+        }
+        $client->setCredentials($sc_user, $sc_pass);
+
+
+	$query = 'IncidentID="'.$im.'"';
+
+	$keys = new soapval('keys','IncidentKeysType',"","http://servicecenter.peregrine.com/PWS",false,array("query" => $query));
+	$instance = new soapval("instance","IncidentInstanceType","","http://servicecenter.peregrine.com/PWS");
+	$model = new soapval("model", "IncidentModelType",array($keys,$instance),null,"http://servicecenter.peregrine.com/PWS");
+	$RetrieveIncidentListRequest = new soapval("RetrieveIncidentListRequest","RetrieveIncidentListRequestType",$model,"http://servicecenter.peregrine.com/PWS");
+	$result = $client->call('RetrieveIncidentList',$RetrieveIncidentListRequest->serialize('literal'),"http://servicecenter.peregrine.com/PWS");
+
+        if ($client->fault) {
+                $return[$key] = "Client fault";
+        } else {
+                $err = $client->getError();
+                if ($err) {
+                        return(array('#markup' => t("Client error: ".$err)));
+		}
+	}
+
+	return(array('#markup' => t(_service_manager_view_incident_im_to_table($result['instance']))));
+}
+
+function _service_manager_view_incident_im_to_table($im) {
+	$header = array();
+	$rows = array();
+
+/*
+	switch($im['HelpDesk']) {
+		case "Store Support":
+			$fields['IncidentID'] = 'IM Number';
+			$fields['Location'] = 'Location';
+			$fields['SiteID'] = 'Site ID';
+			$fields['EmergencyContact'] = 'Contact Info';
+			$fields['LocationDetail'] = 'Location Details';
+			$fields['Contact'] = 'Reported By';
+			$fields['IMTicketStatus'] = 'Status';
+			$fields['OpenTime'] = 'Open Time';
+			$fields['ClosedTime'] = 'Close Time';
+			$fields['Priority'] = 'Priority';
+			$fields['StoreRoom'] = 'Room';
+			$fields['DevType'] = 'Device';
+			$fields['ConfigurationItem'] = 'Affected Item';
+			$fields['LaneId'] = 'Lane';
+			$fields['PrimaryAssignmentGroup'] = 'Assignment';
+			$fields['VendorStatus'] = 'External Vendor Status';
+			$fields['VendorTech'] = 'External Vendor Tech';
+			$fields['VendorETA'] = 'External Vendor ETA';
+			$fields['Graffiti'] = 'External Ticket Number';
+			$fields['BriefDescription'] = 'Brief Description';
+			$fields['IncidentDescription'] = 'Description';
+			$fields['JournalUpdates'] = 'Updates';
+			$fields['Resolution'] = 'Resolution';
+			break;		
+		case "PC Support":
+			$fields['IncidentID'] = 'IM Number';
+			$fields['Contact'] = 'Reported By';
+			$fields['IMTicketStatus'] = 'Status';
+			$fields['OpenTime'] = 'Open Time';
+			$fields['ClosedTime'] = 'Close Time';
+			$fields['Priority'] = 'Priority';
+			$fields['PCCategory'] = 'Category';
+			$fields['SiteCategory'] = 'Subcategory';
+			$fields['ProductType'] = 'Product Type';
+			$fields['ProblemType'] = 'Problem Type';
+			$fields['ConfigurationItem'] = 'Asset ID';
+			$fields['PrimaryAssignmentGroup'] = 'Assignment';
+			$fields['IncidentDescription'] = 'Description';
+			$fields['JournalUpdates'] = 'Updates';
+			$fields['Resolution'] = 'Resolution';
+			break;
+		case "Network Services":
+			$fields['IncidentID'] = 'IM Number';
+			$fields['Location'] = 'Location';
+			$fields['SiteID'] = 'Site ID';
+			$fields['EmergencyContact'] = 'Contact Info';
+			$fields['Contact'] = 'Reported By';
+			$fields['IMTicketStatus'] = 'Status';
+			$fields['OpenTime'] = 'Open Time';
+			$fields['ClosedTime'] = 'Close Time';
+			$fields['Priority'] = 'Priority';
+			$fields['ConfigurationItem'] = 'Affected Item';
+			$fields['CircuitID'] = 'Circuit ID';
+			$fields['BillingType'] = 'Release for Testing';
+			$fields['DeliveryDate'] = 'Release Time';
+			$fields['ReclaimPallets'] = 'Vendor Severity';
+			$fields['ReclaimBoxes'] = 'Symptom Code';
+			$fields['Graffiti'] = 'Vendor Ticket Number';
+			$fields['PrimaryAssignmentGroup'] = 'Assignment';
+			$fields['IncidentDescription'] = 'Description';
+			$fields['JournalUpdates'] = 'Updates';
+			$fields['Resolution'] = 'Resolution';
+			break;
+		case "Warehouse":
+			$fields['IncidentID'] = 'IM Number';
+			$fields['Location'] = 'Location';
+			$fields['SiteID'] = 'Site ID';
+			$fields['EmergencyContact'] = 'Contact Info';
+			$fields['Contact'] = 'Reported By';
+			$fields['IMTicketStatus'] = 'Status';
+			$fields['OpenTime'] = 'Open Time';
+			$fields['ClosedTime'] = 'Close Time';
+			$fields['Priority'] = 'Priority';
+			$fields['WarehouseIssue'] = 'Issue';
+			$fields['RetailCenter'] = 'Retail Center';
+			$fields['CauseCode'] = 'Reason Code';
+			$fields['PayrollNo'] = 'Credit Status';
+			$fields['BriefDescription'] = 'AnpQaNeedReg';
+			$fields['PrimaryAssignmentGroup'] = 'Assignment';
+			$fields['IncidentDescription'] = 'Description';
+			$fields['JournalUpdates'] = 'Updates';
+			$fields['Resolution'] = 'Resolution';
+			break;
+		case "Operation":
+			$fields['IncidentID'] = 'IM Number';
+			$fields['IMTicketStatus'] = 'Status';
+			$fields['OpenTime'] = 'Open Time';
+			$fields['ClosedTime'] = 'Close Time';
+			$fields['Priority'] = 'Priority';
+			$fields['AppQualifier'] = 'Application Qualifier';
+			$fields['Subcomponent'] = 'Application Name';
+			$fields['JobName'] = 'Job Name';
+			$fields['DevType'] = 'Backup Related';
+			$fields['ANPAffected'] = 'Server Name';
+			$fields['Floor'] = 'Rack Number';
+			$fields['PrimaryAssignmentGroup'] = 'Assignment';
+			$fields['IncidentDescription'] = 'Description';
+			$fields['JournalUpdates'] = 'Updates';
+			$fields['Resolution'] = 'Resolution';
+			break;
+		case "Emergency":
+			$fields['IncidentID'] = 'IM Number';
+			$fields['TITLE_1'] = 'Location Information';
+			$fields['Location'] = 'Store #';
+			$fields['SiteID'] = 'Site ID';
+			$fields['Contact'] = 'Reported By';
+			$fields['ANPCorn'] = 'Reported by title';
+			$fields['AnpOtherReturn'] = 'Caller is MIC/PIC';
+			$fields['AlternateContact'] = 'MIC/PIC name';
+			$fields['Dept'] = 'MIC/PIC cell phone';
+			$fields['TITLE_2'] = 'Emergency Alert Types';
+			//$fields['EmergencyAlert'] = '';
+			$fields['AnpWarehouseDept2'] = 'Full Power Outage';
+			$fields['CustomerNumber'] = 'Partial Power Outage';
+			$fields['BillingType'] = 'Gas Leak';
+			$fields['AnpInvoiceNumber'] = 'Civil Unrest';
+			$fields['AnpWarehouseNumber'] = 'Fire';
+			$fields['AnpSealOn'] = 'Flood';
+			$fields['AnpSealOff'] = 'Structural';
+			$fields['AnpToStore'] = 'Refrigeration';
+			$fields['ANPRobbery'] = 'Robbery';
+			$fields['ANPBurglary'] = 'Burglary';
+			$fields['ANPPolice'] = 'Police Investigation';
+			$fields['ANPFatality'] = 'Fatality';
+			$fields['ANPMedia'] = 'Any Incident Likely to Draw Media Attention';
+			$fields['Phone'] = 'Other';
+			$fields['AnpFromStore'] = 'Fire Location';
+			$fields['AnpTrailerType'] = 'Flood Location';
+			$fields['AnpBails'] = 'Structural Location';
+			$fields['AnpWood'] = 'Product Location';
+			$fields['ProductType'] = 'Other Issue';
+			$fields['TITLE_3'] = 'Additional Information';
+			$fields['ANPClep'] = 'Store Closed';
+			$fields['AnpOrange'] = 'Police /Fire on site';
+			$fields['ReclaimPallets'] = 'Store Mgr Notified';
+			$fields['AnpOrderPollDate'] = 'Closed Since';
+			$fields['ANPReclaimBoxes'] = 'Power Authority Status';
+			$fields['TITLE_4'] = 'Refrigeration Information';
+			$fields['AnpPlastic'] = 'Product Protected';
+			$fields['AnpPlasticPallet'] = 'Dry Ice Ordered';
+			$fields['AnpStoreToStorePallet'] = 'Store AC working';
+			$fields['AnpStoreToWhsePallet'] = 'USM contacted';
+			$fields['Graffiti'] = 'Cost of Product at risk';
+//			$fields['TITLE_5'] = 'Contact Information';
+			$fields['EmergencyContact'] = 'Contact Info';
+			//$fields['TITLE_6'] = '';
+			$fields['IncidentDescription'] = 'Description';
+			$fields['JournalUpdates'] = 'Updates';
+			$fields['Resolution'] = 'Resolution';
+			break;
+		case "BMC":
+			$fields['IncidentID'] = 'IM Number';
+			$fields['IMTicketStatus'] = 'Status';
+			$fields['OpenTime'] = 'Open Time';
+			$fields['ClosedTime'] = 'Close Time';
+			$fields['Priority'] = 'Priority';
+			$fields['ConfigurationItem'] = 'Tool ID';
+			$fields['ReferenceNo'] = 'Alert ID';
+			$fields['DevType'] = 'Object ID';
+			$fields['NetworkName'] = 'Network Name';
+			$fields['FailingComponent'] = 'Failing Component';
+			$fields['Location'] = 'Server';
+			$fields['PrimaryAssignmentGroup'] = 'Assignment';
+			$fields['IncidentDescription'] = 'Description';
+			$fields['JournalUpdates'] = 'Updates';
+			$fields['Resolution'] = 'Resolution';
+			break;
+		default:
+			$fields['IncidentID'] = 'IM Number';
+			$fields['IMTicketStatus'] = 'Status';
+			$fields['OpenTime'] = 'Open Time';
+			$fields['ClosedTime'] = 'Close Time';
+			$fields['Priority'] = 'Priority';
+			$fields['ConfigurationItem'] = 'Tool ID';
+			$fields['ReferenceNo'] = 'Alert ID';
+			$fields['DevType'] = 'Object ID';
+			$fields['NetworkName'] = 'Network Name';
+			$fields['FailingComponent'] = 'Failing Component';
+			$fields['Location'] = 'Server';
+			$fields['PrimaryAssignmentGroup'] = 'Assignment';
+			$fields['IncidentDescription'] = 'Description';
+			$fields['JournalUpdates'] = 'Updates';
+			$fields['Resolution'] = 'Resolution';
+			break;
+	}
+*/
+	$tax_lookup = taxonomy_get_term_by_name($im['HelpDesk'],'service_manager_helpdesk_types');
+	if(empty($tax_lookup)) {
+		return("No display taxonomy set for incidents of type ".$im['HelpDesk']);
+	}
+	$term = array_shift(taxonomy_get_term_by_name($im['HelpDesk'],'service_manager_helpdesk_types'));
+	$term_wrapper = entity_metadata_wrapper('taxonomy_term',$term->tid);
+//	return("<pre>".print_r($term_wrapper->field_service_manager_field_name->value(),TRUE)."</pre>");
+
+	$sm_fields = $term_wrapper->field_service_manager_field_name->value();
+	$friendly = $term_wrapper->field_friendly_name->value();
+	foreach($sm_fields as $k => $v) {
+		if(isset($friendly[$k])) {
+			$fields[$v] = $friendly[$k];
+		}
+	}
+
+	foreach($fields as $key => $name) {
+		if(substr($key,0,5) == "TITLE") {
+			$rows[] = array("","<h5>".$name."</h5>");
+		} else {
+			if(isset($im[$key])) {
+				if(is_array($im[$key])) {
+					$rows[] = array("<b>".$name."</b>",implode("<br />",$im[$key]));
+				} else {
+					$rows[] = array("<b>".$name."</b>",$im[$key]);
+				}
+			}	
+		}	
+	}
+	return(theme('table',array('header' => $header,'rows' => $rows)));
+}

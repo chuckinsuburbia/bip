@@ -1,0 +1,9 @@
+name = Service Manager Store Contacts
+description = This module contains functions to query contact information for a store from Service Manager and LDAP
+core = 7.x
+package = "service_manager"
+dependencies[] = service_manager_base
+dependencies[] = nusoap_include
+dependencies[] = ldap_authentication
+
+version = "7.x-X.X"

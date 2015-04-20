@@ -1,0 +1,151 @@
+<?php
+
+function service_manager_store_contacts_menu () {
+	$items['service_manager/store_contacts'] = array(
+		'title' => 'Store Contacts',
+		'page callback' => 'service_manager_store_contacts_store_emergency_contact',
+		'access arguments' => array('access service_manager content'),
+		'type' => MENU_NORMAL_ITEM,
+	);
+	$items['service_manager/store_contact/%'] = array(
+		'title' => 'Store Contacts',
+		'page callback' => 'service_manager_store_contacts_store_emergency_contact',
+		'page arguments' => array(2),
+		'access arguments' => array('access service_manager content'),
+		'type' => MENU_NORMAL_ITEM,
+	);
+	return $items;
+}
+
+function service_manager_store_contacts_get_location_list() {
+	$return = "";
+	$sc = variable_get('service_manager_config_wsdl_client_url', '');
+	$sc_user = variable_get('service_manager_username','');
+	$sc_pass = variable_get('service_manager_password','');
+
+	$cache = new nusoap_wsdlcache('/tmp', 86400);
+        $wsdl = $cache->get($sc);
+        if(is_null($wsdl)) {
+                $wsdl = new wsdl($sc, '', '', '', '', 5);
+                $cache->put($wsdl);
+        }
+
+        $client = new nusoap_client($wsdl, 'wsdl', false, false, false, false, 0, 600);
+        $err = $client->getError();
+        if ($err) {
+                return('<h2>Constructor error</h2><pre>' . $err . '</pre>');
+        }
+        $client->setCredentials($sc_user, $sc_pass);
+
+        $query = 'SiteCategory="STORE"&closed="false"';
+        $keys = new soapval('keys','ConfigurationKeysType',"","http://servicecenter.peregrine.com/PWS",false,array("query" => $query));
+        $instance = new soapval("instance","ConfigurationInstanceType","","http://servicecenter.peregrine.com/PWS");
+        $model = new soapval("model", "ConfigurationModelType",array($keys,$instance),null,"http://servicecenter.peregrine.com/PWS");
+        $RetrieveLocationListRequest = new soapval("RetrieveLocationListRequest","RetrieveLocationListRequestType",$model,"http://servicecenter.peregrine.com/PWS");
+        $result = $client->call('RetrieveLocationList',$RetrieveLocationListRequest->serialize('literal'),"http://servicecenter.peregrine.com/PWS");
+
+        if ($client->fault) {
+                return("Client fault");
+        } else {
+                $err = $client->getError();
+                if ($err) {
+                        return("Client error: ".$err);
+                } else {
+                        $return .= "<pre>".print_r($result['instance'],TRUE)."</pre>";
+                }
+        }
+	return(array('#markup' => t($return)));
+}
+
+function service_manager_store_contacts_store_emergency_contact($location = NULL) {
+	$return = "";
+	if($location == NULL && isset($_POST['location'])) {
+		$location = $_POST['location'];
+	}
+	if($location == NULL) {
+		$return .= "<form method='POST' action='/".request_path()."'>";
+		$return .= "Enter Store Number: <input type='text' name='location'> <input type='submit'></form>";
+		return(t($return));
+	}
+	
+	$sc = variable_get('service_manager_config_wsdl_client_url', '');
+	$sc_user = variable_get('service_manager_username','');
+	$sc_pass = variable_get('service_manager_password','');
+
+        $client = new nusoap_client($sc, 'wsdl', false, false, false, false, 0, 600);
+        $err = $client->getError();
+        if ($err) {
+                return('<h2>Constructor error</h2><pre>' . $err . '</pre>');
+        }
+        $client->setCredentials($sc_user, $sc_pass);
+
+	$query = 'Location="'.$location.'"';
+	$keys = new soapval('keys','LocationKeysType',"","http://servicecenter.peregrine.com/PWS",false,array("query" => $query));
+	$instance = new soapval("instance","LocationInstanceType","","http://servicecenter.peregrine.com/PWS");
+	$model = new soapval("model", "LocationModelType",array($keys,$instance),null,"http://servicecenter.peregrine.com/PWS");
+	$RetrieveLocationRequest = new soapval("RetrieveLocationRequest","RetrieveLocationRequestType",$model,"http://servicecenter.peregrine.com/PWS");
+	$result = $client->call('RetrieveLocation',$RetrieveLocationRequest->serialize('literal'),"http://servicecenter.peregrine.com/PWS");
+	
+        if ($client->fault) {
+                return("Client fault");
+        } else {
+                $err = $client->getError();
+                if ($err) {
+                        return("Client error: ".$err);
+		}
+	}
+
+	$return .= "<h3>".$location."</h3>";
+	$header = array("Title","Name");
+	$rows = array();
+
+	$displayUsers = array(
+		'Maintenance Manager' => $result['model']['instance']['AnpMainteanceManager'],
+		'District Manager' => $result['model']['instance']['AnpDictrictManager'],
+		'Asset Protection Specialist' => $result['model']['instance']['AnpAssetProtectionSpecialist'],
+		'Store Support Manager' => $result['model']['instance']['AnpSpecialist'],
+		'Champion of Banner' => $result['model']['instance']['AnpVpOperations'],
+		'OE Specialist' => $result['model']['instance']['AnpOeSpecialist'],
+		'Support Services Director' => $result['model']['instance']['AnpDsa'],
+	);
+	if(isset($result['model']['instance']['RXDM'])) {
+		$displayUsers['RX District Manager'] = $result['model']['instance']['RXDM'];
+	}
+	$displayAttributes = array(
+		'Name' => 'cn',
+		'E-Mail' => 'mail',
+		'Mobile' => 'mobile',
+		'Office' => 'telephonenumber',
+	);
+
+	foreach($displayUsers as $title => $username) {
+		$ldap_user = service_manager_store_contacts_ldap_lookup($username);
+		if($ldap_user['count'] > 0) {
+			$sub_rows = array();
+			foreach($displayAttributes as $attrName => $attr) {
+				if(isset($ldap_user[0][$attr][0])) $sub_rows[] = array("<b>".$attrName."</b>",$ldap_user[0][$attr][0]);
+			}
+			$tbl = theme('table',array('header' => array(),'rows' => $sub_rows));
+			$div = theme('ctools_collapsible',array('handle' => $username, 'content' => $tbl, 'collapsed' => TRUE));
+			$rows[] = array("<b>".$title."</b>",$div);
+		} else {
+			$rows[] = array("<b>".$title."</b>",$username);
+		}
+	}
+
+	$return .= theme('table',array('header' => $header,'rows' => $rows));
+
+	return(t($return));
+}
+
+function service_manager_store_contacts_ldap_lookup($username) {
+	// Get all enabled enabled servers.
+	if ($ldap_servers = ldap_servers_get_servers(NULL, 'enabled')) {
+		foreach($ldap_servers as $ldap_server) {
+			if ($results = $ldap_server->search($ldap_server->basedn[0],'samaccountname='.$username)) {
+				return($results);
+			}
+		}
+		return(t("No LDAP result found for username: ".$username));
+	}
+}

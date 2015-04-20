@@ -1,0 +1,7 @@
+name = Service Manager View Incident
+description = This module contains functions to display an incident from Service Manager
+core = 7.x
+package = "service_manager"
+dependencies[] = service_manager_base
+
+version = "7.x-X.X"
