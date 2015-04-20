@@ -212,7 +212,7 @@ function service_manager_store_distro_form_submit($form, &$form_state) {
 					foreach($ldap_servers as $ldap_server) {
 						foreach($ldap_server->basedn as $ou) {
 							if ($ldap_results = $ldap_server->search($ou, 'SAMAccountName='.$store.$lookup)) {
-								$results .= $ldap_server->name."<pre>".print_r($ldap_results,TRUE)."</pre>";
+//								$results .= $ldap_server->name."<pre>".print_r($ldap_results,TRUE)."</pre>";
 								if($ldap_results['count'] == 1 && isset($ldap_results[0]['mail'][0])) {
 									$mailto[] = $ldap_results[0]['mail'][0];
 									$found = TRUE;
@@ -233,7 +233,7 @@ function service_manager_store_distro_form_submit($form, &$form_state) {
 						foreach($ldap_servers as $ldap_server) {
 							foreach($ldap_server->basedn as $ou) {
 								if ($ldap_results = $ldap_server->search($ou, 'SAMAccountName='.$name)) {
-									$results .= $ldap_server->name."<pre>".print_r($ldap_results,TRUE)."</pre>";
+//									$results .= $ldap_server->name."<pre>".print_r($ldap_results,TRUE)."</pre>";
 									if($ldap_results['count'] == 1 && isset($ldap_results[0]['mail'][0])) {
 										$mailto[] = $ldap_results[0]['mail'][0];
 										$found = TRUE;
