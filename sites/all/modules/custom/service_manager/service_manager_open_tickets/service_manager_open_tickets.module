@@ -1,0 +1,167 @@
+<?php
+
+function service_manager_open_tickets_menu () {
+	$items['service_manager/open_tickets'] = array(
+		'title' => 'Open Tickets',
+		'page callback' => 'service_manager_open_tickets_page',
+		'access arguments' => array('access service_manager content'),
+		'type' => MENU_NORMAL_ITEM,
+	);
+	$items['ajax/service_manager/open_tickets/pleasewait'] = array(
+                'page callback' => 'service_manager_open_tickets_pleasewait_get_ajax',
+                'delivery callback' => 'service_manager_open_tickets_pleasewait_ajax_callback',
+                'access arguments' => array('access service_manager content'),
+                'type' => MENU_CALLBACK,
+        );
+	$items['ajax/service_manager/open_tickets/query/%/%'] = array(
+                'page callback' => 'service_manager_open_tickets_query_get_ajax',
+		'page arguments' => array(4,5),
+                'delivery callback' => 'service_manager_open_tickets_query_ajax_callback',
+                'access arguments' => array('access service_manager content'),
+                'type' => MENU_CALLBACK,
+        );
+	return($items);
+}
+
+function service_manager_open_tickets_page() {
+	drupal_add_library('system', 'drupal.ajax');
+	$markup = <<<EOM
+<script>
+	function service_manager_open_tickets_query_ajax_load(heading, query) {
+		jQuery("#ajax-target-ticket-list").load("/ajax/service_manager/open_tickets/pleasewait");
+		path = "/ajax/service_manager/open_tickets/query/" + heading + "/" + query;
+		jQuery("#ajax-target-ticket-list").load(path);
+	}
+</script>
+EOM;
+
+	$links = array();
+	$vocab = taxonomy_vocabulary_machine_name_load('service_manager_open_ticket_lookups');
+	$terms = entity_load('taxonomy_term', FALSE, array('vid' => $vocab->vid));
+	foreach ($terms as $term) {
+		$query = field_get_items('taxonomy_term', $term, 'field_query');
+		$links[$term->name] = $query[0]['value'];
+	}
+
+	foreach($links as $k => $v) {
+		$markup .= "<a href='#' onclick='service_manager_open_tickets_query_ajax_load(\"".urlencode($k)."\",\"".urlencode($v)."\");'>".$k."</a><br />\n";
+	}
+	$markup .= '<hr /><br /><div id="ajax-target-ticket-list"></div>';
+	return(array('#markup' => t($markup)));
+}
+
+function service_manager_open_tickets_pleasewait_get_ajax() {
+        $return = "Please wait one moment...<br /><img src='".file_create_url('public://preloader.gif')."' width='50px' />";
+
+        return $return;
+}
+function service_manager_open_tickets_pleasewait_ajax_callback($page_callback_result) {
+        echo($page_callback_result);
+}
+
+function service_manager_open_tickets_query_get_ajax($heading,$query) {
+	sleep(1);
+	$return = "";
+
+	$queries = array($heading => $query);
+	$tickets = _service_manager_open_tickets_recursive_query($queries);
+//	$return .= "<pre>".print_r($tickets,TRUE)."</pre>";	
+	$return .= _service_manager_open_tickets_array_to_table($tickets);
+
+        return(array('#markup' => t($return)));
+}
+function service_manager_open_tickets_query_ajax_callback($page_callback_result) {
+        echo(drupal_render($page_callback_result));
+}
+
+
+
+function _service_manager_open_tickets_recursive_query($queries) {
+	$return = array();
+	$sc = variable_get('service_manager_incident_wsdl_client_url', '');
+	$sc_user = variable_get('service_manager_username','');
+	$sc_pass = variable_get('service_manager_password','');
+
+	$cache = new nusoap_wsdlcache('/tmp', 86400);
+        $wsdl = $cache->get($sc);
+        if(is_null($wsdl)) {
+                $wsdl = new wsdl($sc, '', '', '', '', 5);
+                $cache->put($wsdl);
+        }
+
+        $client = new nusoap_client($wsdl, 'wsdl', false, false, false, false, 0, 600);
+        $err = $client->getError();
+        if ($err) {
+                return('<h2>Constructor error</h2><pre>' . $err . '</pre>');
+        }
+        $client->setCredentials($sc_user, $sc_pass);
+
+	foreach($queries as $key => $query) {
+		if(is_array($query)) {
+			$return[$key] = _service_manager_open_tickets_recursive_query($query);
+		} else {
+			$keys = new soapval('keys','IncidentKeysType',"","http://servicecenter.peregrine.com/PWS",false,array("query" => $query));
+			$instance = new soapval("instance","IncidentInstanceType","","http://servicecenter.peregrine.com/PWS");
+			$model = new soapval("model", "IncidentModelType",array($keys,$instance),null,"http://servicecenter.peregrine.com/PWS");
+			$RetrieveIncidentListRequest = new soapval("RetrieveIncidentListRequest","RetrieveIncidentListRequestType",$model,"http://servicecenter.peregrine.com/PWS");
+			$result = $client->call('RetrieveIncidentList',$RetrieveIncidentListRequest->serialize('literal'),"http://servicecenter.peregrine.com/PWS");
+		
+		        if ($client->fault) {
+		                $return[$key] = "Client fault";
+		        } else {
+		                $err = $client->getError();
+		                if ($err) {
+		                        $return[$key] = "Client error: ".$err;
+				} else {
+					if($result['!status'] !== 'FAILURE') {
+						if(isset($result['instance']['IncidentID'])) {
+							$return[$key][0] = $result['instance'];
+						} else {
+							$return[$key] = $result['instance'];
+						}
+					} else {
+						$return[$key]['!message'] = $result['!message'];
+					}
+				}
+			}
+		}
+	}
+	return($return);
+}
+
+function _service_manager_open_tickets_array_to_table($array,$header=FALSE) {
+	if($header == TRUE) {
+		$header = array(t('Incident'),t('Site'),t('Assignment'),t('Open Time'),t('Description'));
+	} else {
+		$header = array();
+	}
+	$rows = array();
+
+	//Loop through tickets and format into table rows
+	foreach($array as $k => $v) {
+		if(is_numeric($k)) { 
+			$link = '<a href="/service_manager/view_incident/'.$v['IncidentID'].'">'.$v['IncidentID'].'</a>';
+			$rows[] = array($link,$v['Location'],$v['PrimaryAssignmentGroup'],date('Y-m-d H:i:s',strtotime($v['OpenTime'])),$v['BriefDescription']);
+		} elseif($k == '!message') {
+			$rows[] = array(array('data' => $v, 'colspan' => 5));
+		} else {
+			$content = _service_manager_open_tickets_array_to_table($v,TRUE);
+			$ticketCount = is_array($v) ? count(array_filter(array_keys($v),'is_numeric')) : 0;
+			if($ticketCount > 0) {
+				$handle = '<h3>'.$k.' ('.$ticketCount.')</h3>';
+			} else {
+				$handle = '<h3>'.$k.'</h3>';
+			}
+			$div = theme('ctools_collapsible',
+				array(
+					'handle' => $handle,
+					'content' => $content,
+					'collapsed' => TRUE
+				)
+			);
+			$rows[] = array(array('data' => $div, 'colspan' => 5));
+		}
+	}
+	return(theme('table',array('header' => $header,'rows' => $rows)));
+}
+

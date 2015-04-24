@@ -1,0 +1,7 @@
+name = Service Manager Open Tickets
+description = This module contains functions to display open tickets from Service Manager
+core = 7.x
+package = "service_manager"
+dependencies[] = service_manager_view_incident
+
+version = "7.x-X.X"
