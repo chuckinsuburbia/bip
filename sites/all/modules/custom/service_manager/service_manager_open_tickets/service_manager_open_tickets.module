@@ -43,11 +43,137 @@ EOM;
 		$links[$term->name] = $query[0]['value'];
 	}
 
+	$handle = "Common Queries";
+	$content = "";
 	foreach($links as $k => $v) {
-		$markup .= "<a href='#' onclick='service_manager_open_tickets_query_ajax_load(\"".urlencode($k)."\",\"".urlencode($v)."\");'>".$k."</a><br />\n";
+		$content .= "<a href='#' onclick='service_manager_open_tickets_query_ajax_load(\"".urlencode($k)."\",\"".urlencode($v)."\");'>".$k."</a><br />\n";
 	}
-	$markup .= '<hr /><br /><div id="ajax-target-ticket-list"></div>';
+	$markup .= theme('ctools_collapsible',
+		array(
+			'handle' => $handle,
+			'content' => $content,
+			'collapsed' => TRUE
+		)
+	);
+
+	$handle = "Search";
+	$form = drupal_get_form('service_manager_open_tickets_form');
+	$markup .= theme('ctools_collapsible',
+		array(
+			'handle' => $handle,
+			'content' => drupal_render($form),
+			'collapsed' => TRUE
+		)
+	);
+	
+	$markup .= '<hr /><div id="ajax-target-ticket-list"></div>';
+
 	return(array('#markup' => t($markup)));
+}
+
+function service_manager_open_tickets_form($form,&$form_state) {
+	$form = array();
+	$form['IncidentID'] = array(
+		'#title' => t('Incident Number'),
+		'#type' => 'textfield',
+        );
+	$form['Location'] = array(
+		'#title' => t('Location'),
+		'#type' => 'textfield',
+        );
+	$form['City'] = array(
+		'#title' => t('City'),
+		'#type' => 'textfield',
+        );
+	$form['PrimaryAssignmentGroup'] = array(
+		'#title' => t('Assignment'),
+		'#type' => 'textfield',
+        );
+	$form['HelpDesk'] = array(
+		'#title' => t('HelpDesk'),
+		'#type' => 'textfield',
+        );
+	$form['Priority'] = array(
+		'#title' => t('Priority'),
+		'#type' => 'textfield',
+        );
+	$form['IncidentDescription'] = array(
+		'#title' => t('Description'),
+		'#type' => 'textfield',
+        );
+	$form['WarehouseIssue'] = array(
+		'#title' => t('Warehouse Issue'),
+		'#type' => 'textfield',
+        );
+/*
+	$form['Specialist'] = array(
+		'#title' => t('Store Support Manager'),
+		'#type' => 'textfield',
+        );
+*/
+	$form['submit'] = array(
+		'#value' => t('Search'),
+		'#type' => 'submit',
+		"#ajax" => array(
+			"callback" => "service_manager_open_tickets_form_callback", 
+			"wrapper" => "ajax-target-ticket-list",
+			"effect" => "fade",
+		),
+//		'#submit' => array('service_manager_open_tickets_form_submit'),
+	);
+
+	if(isset($form_state['storage']['results'])) {
+		$form['results'] = $form_state['storage']['results'];
+	}
+
+        return $form;
+}
+function service_manager_open_tickets_form_callback($form,&$form_state) {
+	ini_set('memory_limit','2G');
+	ini_set('max_execution_time',0);
+
+	$values = $form_state['values'];
+	unset($values['submit'],$values['form_build_id'],$values['form_token'],$values['form_id'],$values['op']);
+
+	$q = array('IMTicketStatus~="Closed"');
+	foreach($values as $k => $v) {
+		if($v != "") {
+			switch($k) {
+				case "City":
+					$loc_query = 'City="'.$v.'"&closed="false"';
+					$locations = _service_manager_open_tickets_location_lookup($loc_query);
+					if(!is_array($locations)) {
+						return(array('#markup' => '<div id="ajax-target-ticket-list">Error: locations not found for search string: '.$loc_query.'<br />'.$locations.'</div>'));
+					} else {
+						$q[] = '(Location="'.implode('" or Location="',$locations).'")';
+					}
+					break;
+				case "Specialist":
+					$loc_query = 'AnpSpecialist="'.$v.'"&closed="false"';
+					$locations = _service_manager_open_tickets_location_lookup($loc_query);
+					if(!is_array($locations)) {
+						return(array('#markup' => '<div id="ajax-target-ticket-list">Error: locations not found for search string: '.$loc_query.'<br />'.$locations.'</div>'));
+					} else {
+						$q[] = '(Location="'.implode('" or Location="',$locations).'")';
+					}
+					break;
+				default:
+					$q[] = $k.'#"'.$v.'"';
+			}
+		}
+	}
+	if(!isset($query)) {
+		$query = array('Search Results' => implode("&",$q));
+	}
+//	dsm($query);
+
+	$tickets = _service_manager_open_tickets_recursive_query($query);
+//	dsm($tickets);
+	$table = array('#markup' => '<div id="ajax-target-ticket-list">'._service_manager_open_tickets_array_to_table($tickets).'</div>');
+
+//	$form_state['storage']['results'] = $table;
+//	$form_state['rebuild'] = TRUE;
+	return($table);
 }
 
 function service_manager_open_tickets_pleasewait_get_ajax() {
@@ -75,9 +201,56 @@ function service_manager_open_tickets_query_ajax_callback($page_callback_result)
 }
 
 
+function _service_manager_open_tickets_location_lookup($query) {
+	$return = array();
+	$sc = variable_get('service_manager_config_wsdl_client_url','');
+	$sc_user = variable_get('service_manager_username','');
+	$sc_pass = variable_get('service_manager_password','');
+
+	$cache = new nusoap_wsdlcache('/tmp', 86400);
+        $wsdl = $cache->get($sc);
+        if(is_null($wsdl)) {
+                $wsdl = new wsdl($sc, '', '', '', '', 5);
+                $cache->put($wsdl);
+        }
+
+        $client = new nusoap_client($wsdl, 'wsdl', false, false, false, false, 0, 600);
+        $err = $client->getError();
+        if ($err) {
+                return('<h2>Constructor error</h2><pre>' . $err . '</pre>');
+        }
+        $client->setCredentials($sc_user, $sc_pass);
+
+	$keys = new soapval('keys','LocationKeysType',"","http://servicecenter.peregrine.com/PWS",false,array("query" => $query));
+	$instance = new soapval("instance","LocationInstanceType","","http://servicecenter.peregrine.com/PWS");
+	$model = new soapval("model", "LocationModelType",array($keys,$instance),null,"http://servicecenter.peregrine.com/PWS");
+	$RetrieveLocationListRequest = new soapval("RetrieveLocationListRequest","RetrieveLocationListRequestType",$model,"http://servicecenter.peregrine.com/PWS");
+	$result = $client->call('RetrieveLocationList',$RetrieveLocationListRequest->serialize('literal'),"http://servicecenter.peregrine.com/PWS");
+
+	if ($client->fault) {
+		return("Client fault");
+	}
+	$err = $client->getError();
+	if ($err) {
+		return("Client error: ".$err);
+	}
+	if($result['!status'] != "SUCCESS") {
+		return($result['!status'].": ".$result['!message']);
+	}
+	if(isset($result['instance']['Location'])) {
+		$locations[0] = $result['instance']['Location'];
+	} else {
+		foreach($result['instance'] as $location) {
+			$locations[] = $location['Location'];
+		}
+	}
+//	dsm($result);
+	return($locations);
+}
 
 function _service_manager_open_tickets_recursive_query($queries) {
 	$return = array();
+
 	$sc = variable_get('service_manager_incident_wsdl_client_url', '');
 	$sc_user = variable_get('service_manager_username','');
 	$sc_pass = variable_get('service_manager_password','');
@@ -105,7 +278,7 @@ function _service_manager_open_tickets_recursive_query($queries) {
 			$model = new soapval("model", "IncidentModelType",array($keys,$instance),null,"http://servicecenter.peregrine.com/PWS");
 			$RetrieveIncidentListRequest = new soapval("RetrieveIncidentListRequest","RetrieveIncidentListRequestType",$model,"http://servicecenter.peregrine.com/PWS");
 			$result = $client->call('RetrieveIncidentList',$RetrieveIncidentListRequest->serialize('literal'),"http://servicecenter.peregrine.com/PWS");
-		
+
 		        if ($client->fault) {
 		                $return[$key] = "Client fault";
 		        } else {
@@ -131,7 +304,7 @@ function _service_manager_open_tickets_recursive_query($queries) {
 
 function _service_manager_open_tickets_array_to_table($array,$header=FALSE) {
 	if($header == TRUE) {
-		$header = array(t('Incident'),t('Site'),t('Assignment'),t('Open Time'),t('Description'));
+		$header = array(t('Incident'),t('Site'),t('Priority'),t('Assignment'),t('Open Time'),t('Description'));
 	} else {
 		$header = array();
 	}
@@ -140,8 +313,8 @@ function _service_manager_open_tickets_array_to_table($array,$header=FALSE) {
 	//Loop through tickets and format into table rows
 	foreach($array as $k => $v) {
 		if(is_numeric($k)) { 
-			$link = '<a href="/service_manager/view_incident/'.$v['IncidentID'].'">'.$v['IncidentID'].'</a>';
-			$rows[] = array($link,$v['Location'],$v['PrimaryAssignmentGroup'],date('Y-m-d H:i:s',strtotime($v['OpenTime'])),$v['BriefDescription']);
+			$link = '<a target="_blank" href="/service_manager/view_incident/'.$v['IncidentID'].'">'.$v['IncidentID'].'</a>';
+			$rows[] = array($link,$v['Location'],$v['Priority'],$v['PrimaryAssignmentGroup'],date('Y-m-d H:i:s',strtotime($v['OpenTime'])),substr($v['BriefDescription'],0,50));
 		} elseif($k == '!message') {
 			$rows[] = array(array('data' => $v, 'colspan' => 5));
 		} else {
@@ -156,7 +329,7 @@ function _service_manager_open_tickets_array_to_table($array,$header=FALSE) {
 				array(
 					'handle' => $handle,
 					'content' => $content,
-					'collapsed' => TRUE
+					'collapsed' => FALSE
 				)
 			);
 			$rows[] = array(array('data' => $div, 'colspan' => 5));
