@@ -8,15 +8,6 @@ function service_manager_store_distro_permission() {
 
 function service_manager_store_distro_menu () {
         $items = array();
-	$items['admin/config/services/service_manager/store_distro'] = array(
-                'title' => 'Fetch Assignment Groups',
-                'description' => 'Configuration for Service Manager Fetch Assignment Groups module',
-                'page callback' => 'drupal_get_form',
-                'page arguments' => array('service_manager_store_distro_config_form'),
-                'access arguments' => array('access service_manager administration'),
-                'type' => MENU_LOCAL_TASK,
-                'weight' => 3,
-        );
         $items['service_manager/store_distro'] = array(
                 'title' => 'Build Store Distribution List',
                 'page callback' => 'drupal_get_form',
@@ -28,34 +19,6 @@ function service_manager_store_distro_menu () {
 }
 function service_manager_store_distro_execute() {
   return array('#markup' => '<p>' . t(_service_manager_get_groups()) . '</p>');
-}
-
-function service_manager_store_distro_config_form() {
-	$form['service_manager_store_distro_cron'] = array(
-                '#type' => 'checkbox',
-                '#title' => t('Run during Cron?'),
-                '#default_value' => variable_get('service_manager_store_distro_cron',1),
-                '#description' => t('Do we want to run the fetch periodically through cron?'),
-                '#required' => FALSE,
-        );
-        $form['service_manager_store_distro_interval'] = array(
-                '#type' => 'textfield',
-                '#title' => t('Cron Interval'),
-                '#default_value' => variable_get('service_manager_store_distro_interval',3600),
-                '#size' => 10,
-                '#maxlength' => 10,
-                '#description' => t('The number of seconds between Cron executions.'),
-                '#required' => TRUE,
-        );
-        return system_settings_form($form);
-}
-function service_manager_store_distro_config_form_validate ($form, &$form_state) {
-        if(!ctype_digit(strval($form_state['values']['service_manager_store_distro_interval']))) {
-                form_set_error('service_manager_store_distro_interval', t('Interval value must be an integer.'));
-        }
-        if($form_state['values']['service_manager_store_distro_interval'] <= 0) {
-                form_set_error('service_manager_store_distro_interval', t('Interval value must be greater than zero.'));
-        }
 }
 
 function service_manager_store_distro_form($form, &$form_state) {

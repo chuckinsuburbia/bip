@@ -1,0 +1,304 @@
+<?php
+
+function xmatters_menu () {
+	$items['xmatters'] = array(
+		'title' => 'xMatters',
+		'page callback' => 'xmatters_description',
+		'access arguments' => array('access xmatters content'),
+	);
+	$items['xmatters/onduty'] = array(
+		'title' => 'Who\'s on Duty?',
+		'page callback' => 'xmatters_onduty',
+		'access arguments' => array('access xmatters content'),
+	);
+	$items['admin/config/services/xmatters'] = array(
+                'title' => 'xMatters',
+                'description' => 'Configuration for xMatters Module',
+                'page callback' => 'drupal_get_form',
+                'page arguments' => array('xmatters_config_form'),
+                'access arguments' => array('access xmatters administration'),
+                'type' => MENU_NORMAL_ITEM,
+        );
+	return $items;
+}
+
+function xmatters_config_form ($form, &$form_state) {
+        $form['xmatters_wsdl_url'] = array(
+                '#type' => 'textfield',
+                '#title' => t('Web Service URL'),
+                '#default_value' => variable_get('xmatters_wsdl_url', ''),
+                '#size' => 150,
+                '#maxlength' => 150,
+                '#description' => t('The URL to the xMatters Web Service.'),
+                '#required' => TRUE,
+        );
+        $form['xmatters_wsdl_user'] = array(
+                '#type' => 'textfield',
+                '#title' => t('Web Service User'),
+                '#default_value' => variable_get('xmatters_wsdl_user', ''),
+                '#size' => 25,
+                '#maxlength' => 25,
+                '#description' => t('The xMatters Web Service User.'),
+                '#required' => TRUE,
+        );
+        $form['xmatters_wsdl_pass'] = array(
+                '#type' => 'password',
+                '#title' => t('Web Service Password'),
+                '#default_value' => variable_get('xmatters_wsdl_pass', ''),
+                '#size' => 25,
+                '#maxlength' => 25,
+                '#description' => t('The password for the xMatters Web Service.'),
+                '#required' => TRUE,
+        );
+        return system_settings_form($form);
+}
+
+function xmatters_description() {
+	return array('#markup' => '<p>' . t('Place Holder') . '</p>');
+}
+
+function xmatters_permission() {
+	return array(
+		'access xmatters content' => array( 'title' => t('Access content for the xMatters module'), ),
+		'access xmatters administration' => array( 'title' => t('Administer the xMatters Module'), ),
+		'access xmatters data feeds' => array( 'title' => t('Access data feeds for the xMatters module'), ),
+	);
+}
+
+function xmatters_onduty() {
+	$form_state = array(
+		'method' => 'get',
+		'always_process' => true, // if support for submissions originating outside drupal is needed
+	);
+	$arr = drupal_build_form('xmatters_onduty_form',$form_state);
+        $markup = drupal_render($arr);
+        return array('#markup' => '<p>' . t($markup) . '</p>');
+}
+
+function xmatters_onduty_form($form, &$form_state) {
+	$form = array();
+
+	$form['#method'] = 'get';
+	$form['#token'] = 'false';
+
+	$groups = _xmatters_onduty_find_groups();
+
+	$form['group_options'] = array(
+                '#type' => 'value',
+                '#value' => array(),
+        );
+	foreach($groups as $group) {
+		$form['group_options']['#value'][] = $group['name'];
+	}
+	sort($form['group_options']['#value']);
+	$form['group'] = array(
+                '#title' => t('Group'),
+                '#type' => 'select',
+                '#options' => $form['group_options']['#value'],
+        );
+	$form['submit'] = array(
+                '#value' => t('Submit'),
+                '#type' => 'submit',
+                '#submit' => array('xmatters_onduty_form_submit'),
+        );
+
+	if(isset($form_state['storage']['results'])) {
+                $form['results'] = $form_state['storage']['results'];
+        }
+
+        return $form;
+}
+
+function xmatters_onduty_form_submit($form, &$form_state) {
+	if($form_state['values']['group'] == "") {
+		if(isset($form_state['input']['groupname'])) {
+			$group_keys = array_flip($form_state['values']['group_options']);
+			if(isset($group_keys[$form_state['input']['groupname']])) {
+				$form_state['values']['group'] = $group_keys[$form_state['input']['groupname']];
+			} else {
+				$form_state['storage']['results'] = array('#markup' => "Invalid group specified: ".$form_state['input']['groupname']);
+				$form_state['rebuild'] = TRUE;
+				return $form_state['storage']['results'];
+			}
+		} else {
+			$form_state['rebuild'] = TRUE;
+			return;
+		}
+	}
+
+	$markup = "";
+
+	$url = variable_get('xmatters_wsdl_url', '');
+	$user = variable_get('xmatters_wsdl_user', '');
+	$pass = variable_get('xmatters_wsdl_pass', '');
+
+	$cache = new nusoap_wsdlcache('/tmp', 86400);
+	$wsdl = $cache->get($url);
+	if(is_null($wsdl)) {
+		$wsdl = new wsdl($url, '', '', '', '', 5);
+		$cache->put($wsdl);
+	}
+
+	$client = new nusoap_client($wsdl, 'wsdl', false, false, false, false, 0, 600);
+	$err = $client->getError();
+        if ($err) {
+                return(array('#markup' => '<h2>Constructor error</h2><pre>' . $err . '</pre>'));
+        }
+
+	$group = $form_state['values']['group_options'][$form_state['values']['group']];
+	$startDate = date("d/m/Y h:i:s A",strtotime("-1 day"));
+	$endDate = date("d/m/Y h:i:s A",strtotime("+1 day"));
+	$params = array(
+		'user' => $user,
+		'password' => $pass,
+		'groupName' => $group,
+		'startDate' => $startDate,
+		'endDate' => $endDate,
+		'includeRecipientDetails' => 'false',
+	);
+        $result = $client->call('FindWhoIsOnDuty',$params);
+
+        if ($client->fault) {
+                return(array('#markup' => "Client fault"));
+        } else {
+                $err = $client->getError();
+                if ($err) {
+                        return(array('#markup' => "Client error: ".$err));
+                }
+        }
+//	dsm($result);
+
+	if(isset($result['return']['scheduleList']['schedule']['name'])) {
+		$markup .= _xmatters_onduty_show_schedule($result['return']['scheduleList']['schedule']);
+	} else {
+		foreach($result['return']['scheduleList']['schedule'] as $schedule) {
+			$markup .= _xmatters_onduty_show_schedule($schedule);
+		}
+	}
+
+	$form_state['storage']['results'] = array('#markup' => $markup);
+        $form_state['rebuild'] = TRUE;
+	return $form_state['storage']['results'];
+}
+
+function _xmatters_onduty_show_schedule($schedule) {
+	$markup = "<hr /><b>Schedule ".$schedule['name']."</b><br />";
+	if(isset($schedule['recipientList']['recipient']['targetName'])) {
+		$markup .= _xmatters_onduty_show_recipient($schedule['recipientList']['recipient']['targetName']);
+	} else {
+		foreach($schedule['recipientList']['recipient'] as $recipient) {
+			$markup .= _xmatters_onduty_show_recipient($recipient);
+		}
+	}
+
+	return $markup;
+}
+
+function _xmatters_onduty_show_recipient($recipient) {
+	$markup = "Recipient: ".$recipient['targetName']."; Type: ".$recipient['category']."; Escalation: ".$recipient['escalation']."<br />";
+
+	$url = variable_get('xmatters_wsdl_url', '');
+	$user = variable_get('xmatters_wsdl_user', '');
+	$pass = variable_get('xmatters_wsdl_pass', '');
+
+	$cache = new nusoap_wsdlcache('/tmp', 86400);
+	$wsdl = $cache->get($url);
+	if(is_null($wsdl)) {
+		$wsdl = new wsdl($url, '', '', '', '', 5);
+		$cache->put($wsdl);
+	}
+
+	$client = new nusoap_client($wsdl, 'wsdl', false, false, false, false, 0, 600);
+	$err = $client->getError();
+        if ($err) {
+                return('<h2>Constructor error</h2><pre>' . $err . '</pre>');
+        }
+
+	$params = array(
+		'user' => $user,
+		'password' => $pass,
+	);
+	switch($recipient['category']) {
+		case 'PERSON':
+			$params['searchParameters']['owner'] = $recipient['targetName'];
+			break;
+		case 'DEVICE':
+			$params['searchParameters']['targetName'] = $recipient['targetName'];
+			break;
+		default:
+			$markup .= "<ul><li>Unknown recipient type. Cannot search for devices.</li></ul>";
+			return $markup;
+	}
+
+        $result = $client->call('FindDevices',$params);
+        if ($client->fault) {
+                return("Client fault");
+        } else {
+                $err = $client->getError();
+                if ($err) {
+                        return("Client error: ".$err);
+                }
+        }
+
+//	dsm($result);
+	foreach($result['return']['devices'] as $device) {
+		if(isset($device['name'])) {
+			$devices[$device['order']] = $device;
+		} else {
+			foreach($device as $dev) {
+				$devices[$dev['order']] = $dev;
+			}
+		}
+	}
+	$markup .= "<ol>";
+	foreach($devices as $device) {
+		$markup .= "<li>".$device['name']." - ";
+		if(isset($device['address'])) { $markup .= $device['address']; }
+		if(isset($device['pinOrEmail'])) { $markup .= $device['pinOrEmail']; }
+		if(isset($device['areaCode'])) { $markup .= "(".$device['areaCode'].") "; }
+		if(isset($device['number'])) { $markup .= $device['number']; }
+		$markup .= "</li>";
+	}
+	$markup .= "</ol>";
+
+	return $markup;
+}
+
+function _xmatters_onduty_find_groups() {
+	$url = variable_get('xmatters_wsdl_url', '');
+	$user = variable_get('xmatters_wsdl_user', '');
+	$pass = variable_get('xmatters_wsdl_pass', '');
+
+	$cache = new nusoap_wsdlcache('/tmp', 86400);
+	$wsdl = $cache->get($url);
+	if(is_null($wsdl)) {
+		$wsdl = new wsdl($url, '', '', '', '', 5);
+		$cache->put($wsdl);
+	}
+
+	$client = new nusoap_client($wsdl, 'wsdl', false, false, false, false, 0, 600);
+	$err = $client->getError();
+        if ($err) {
+                return('<h2>Constructor error</h2><pre>' . $err . '</pre>');
+        }
+
+	$params = array(
+		'user' => $user,
+		'password' => $pass,
+		'searchParameters' => array(
+			'active' => 'true',
+		),
+	);
+        $result = $client->call('FindGroups',$params);
+
+        if ($client->fault) {
+                return("Client fault");
+        } else {
+                $err = $client->getError();
+                if ($err) {
+                        return("Client error: ".$err);
+                }
+        }
+
+	return $result['return']['matchingGroups']['group'];
+}

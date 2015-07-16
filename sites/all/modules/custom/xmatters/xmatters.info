@@ -1,0 +1,8 @@
+name = xMatters
+description = This module contains functions to interact with xMatters
+core = 7.x
+package = "control-m"
+configure = admin/config/services/xmatters
+dependencies[] = nusoap_include
+
+version = "7.x-X.X"

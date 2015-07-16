@@ -8,169 +8,80 @@ function controlm_running_long_menu () {
 		'access arguments' => array('access controlm content'),
 		'type' => MENU_NORMAL_ITEM,
 	);
-	$items['ajax/controlm/running_long/pleasewait'] = array(
-                'page callback' => 'controlm_running_long_pleasewait_get_ajax',
-                'delivery callback' => 'controlm_running_long_pleasewait_ajax_callback',
-                'access arguments' => array('access controlm content'),
-                'type' => MENU_CALLBACK,
-        );
-	$items['ajax/controlm/running_long/execute'] = array(
-                'page callback' => 'controlm_running_long_execute_get_ajax',
-                'delivery callback' => 'controlm_running_long_execute_ajax_callback',
-                'access arguments' => array('access controlm content'),
-                'type' => MENU_CALLBACK,
-        );
 	return $items;
 }
-/*
-function controlm_running_long_execute() {
-  return array('#markup' => '<p>' . t(cmPurgeDB()) . '</p>');
-}
-*/
 
 function controlm_running_long_page() {
-        drupal_add_library('system', 'drupal.ajax');
-
-        $markup = "";
-
-        $markup .= <<<EOM
-<code><div id="ajax-target-command-status"></div></code>
-<div id="ajax-target-output">Please wait one moment...</div>
-<script>
-        function controlm_running_long_output_ajax_load() {
-                jQuery("#ajax-target-output").load("/ajax/controlm/running_long/pleasewait");
-                jQuery("#ajax-target-output").load("/ajax/controlm/running_long/execute");
-        }
-        jQuery(document).ready(function($){controlm_running_long_output_ajax_load();});
-</script>
-EOM;
-
-        return(array('#markup' => t($markup)));
-}
-
-function controlm_running_long_pleasewait_get_ajax() {
-        $return = "Please wait one moment...<br /><img src='".file_create_url('public://preloader.gif')."' width='50px' />";
-
-        return $return;
-}
-function controlm_running_long_pleasewait_ajax_callback($page_callback_result) {
-        echo($page_callback_result);
-}
-
-function controlm_running_long_execute_get_ajax() {
 	ini_set('memory_limit','1G');
 	ini_set('max_execution_time',0);
+
+	$refresh = array(
+		'#tag' => 'meta',
+		'#attributes' => array(
+			'name' => 'refresh',
+			'http-equiv' => 'REFRESH',
+			'content' => '30',
+		),
+	);
+	drupal_add_html_head($refresh, 'refresh');
 
 	$return = "";
 
 	//Set up render array
-        $table = array(
-                '#theme' => 'table',
-                '#header' => array(t('Percent Above Avg.'),t('Job Name'),t('Node'),t('Start Time'),t('Run Time'),t('Average'),t('Difference'),t('Min'),t('Max'),t('Doc'),t('Info'),t('Chart')),
-                '#rows' => array(),
-        );
+	$header = array(
+		array('data' => 'Percent Above Average',	'field' => 'diff_pct',	'sort' => 'asc'),
+		array('data' => 'Job Name',	'field' => 'cmja_job_name',	'sort' => 'asc'),
+		array('data' => 'Node',		'field' => 'cmja_node_id',	'sort' => 'asc'),
+		array('data' => 'Start Time',	'field' => 'cmjs_start_time',	'sort' => 'asc'),
+		array('data' => 'Run Time',	'field' => 'run_time',		'sort' => 'asc'),
+		array('data' => 'Average',	'field' => 'avg',		'sort' => 'asc'),
+		array('data' => 'Difference',	'field' => 'diff',		'sort' => 'asc'),
+		array('data' => 'Min',		'field' => 'min',		'sort' => 'asc'),
+		array('data' => 'Max',		'field' => 'max',		'sort' => 'asc'),
+		array('data' => 'Chart'),
+	);
 
-	$hostname = variable_get('controlm_hostname', '');
-        $username = variable_get('controlm_username', '');
-        $identity = variable_get('controlm_identity_file', '');
-        $known_hosts = variable_get('controlm_known_hosts_file', '');
-
-	$cmd = 'ssh -i '.$identity.' -o UserKnownHostsFile='.$known_hosts.' '.$username.'@'.$hostname.' "ctmpsm -LISTJOB EXECUTING | sed \'1,4d\'"';
-	exec($cmd,$psm_output,$rc);
-//	$return .= "<pre>".print_r($psm_output,TRUE)."</pre>";
-	if($rc !== 0) {
-		drupal_set_message('Command returned error '.$rc.': '.$cmd,'error');
-		dsm($psm_output);
-		return;
+	$query = db_select('cm_job_status','cjs');
+	$query->join('cm_job_average','cja','cjs.cmjs_job_name = cja.cmja_job_name');
+	$query->condition('cjs.cmjs_status','Executing','=');
+	$query->where('cja.cmja_dow = DAYOFWEEK(NOW())');
+	$query->where('TIME_TO_SEC(TIMEDIFF(NOW(),cjs.CMJS_START_TIME)) > cja.cmja_average');
+	$query->where('(TIME_TO_SEC(TIMEDIFF(NOW(),cjs.CMJS_START_TIME)) - cja.cmja_average) / cja.cmja_average > 0.1');
+	$query->where('SUBSTRING(cmja_job_name,1,1) COLLATE utf8_bin = UPPER(SUBSTRING(cmja_job_name,1,1))');
+	$query->addExpression('TIMEDIFF(NOW(),cjs.CMJS_START_TIME)','run_time');
+	$query->addExpression('SEC_TO_TIME(cja.cmja_average)','avg');
+	$query->addExpression('TIMEDIFF(TIMEDIFF(NOW(),cjs.CMJS_START_TIME),SEC_TO_TIME(cja.cmja_average))','diff');
+	$query->addExpression('SEC_TO_TIME(cja.cmja_min)','min');
+	$query->addExpression('SEC_TO_TIME(cja.cmja_max)','max');
+	$query->addExpression('ROUND((TIME_TO_SEC(TIMEDIFF(NOW(),cjs.CMJS_START_TIME)) - cja.cmja_average) / cja.cmja_average * 100)','diff_pct');
+	$query->fields('cjs',array('cmjs_start_time'));
+	$query->fields('cja',array('cmja_job_name','cmja_node_id'));
+//	dsm((string) $query);
+//	dsm($query->arguments());
+	$num_rows = $query->countQuery()->execute()->fetchField();
+	if($num_rows = 0) {
+		return("No long-running jobs found at this time.");
+	}
+	$result = $query->extend('PagerDefault')->extend('TableSort')->limit(10)->orderByHeader($header)->execute();
+	foreach($result as $row) {
+//		$return .= "<pre>".print_r($row,TRUE)."</pre>";
+		$rows[] = array(
+			t($row->diff_pct.'%'),
+			t('<a href="/jobdoc/'.$row->cmja_job_name.'" target="_blank">'.$row->cmja_job_name.'</a>'),
+			t($row->cmja_node_id),
+			t($row->cmjs_start_time),
+			t($row->run_time),
+			t($row->avg),
+			t($row->diff),
+			t($row->min),
+			t($row->max),
+			t('<a href="/job-runtime-chart?job_name='.$row->cmja_job_name.'&node='.$row->cmja_node_id.'" target="_blank">Chart</a>'),
+		);
 	}
 
-	foreach($psm_output as $psm_line) {
-		$job = preg_split('/ +/',$psm_line);
-//		$return .= "<pre>".print_r($job,TRUE)."</pre>";
-
-		$cmd = 'ssh -i '.$identity.' -o UserKnownHostsFile='.$known_hosts.' '.$username.'@'.$hostname.' "ctmlog LISTORD '.$job[0].' '.date("ymd 1000",strtotime("-1 day")).' '.date("ymd Hi").'"';
-		exec($cmd,$log_output,$rc);
-//		$return .= "<pre>".print_r($log_output,TRUE)."</pre>";
-		if($rc !== 0) {
-	                drupal_set_message('Command returned error '.$rc.': '.$cmd,'error');
-	                dsm($log_output);
-	                return;
-	        }
-		$log_reverse = array_reverse($log_output);
-		unset($node); unset($elapsed_time); 
-		foreach($log_reverse as $log_line) {
-			if(strpos($log_line,"SUBMITTED TO") !== FALSE) {
-				$split = preg_split('/ +/',$log_line);
-				$node = $split[count($split)-2];
-				continue;
-			}
-			if(strpos($log_line,"JOB STATE CHANGED TO Executing") !== FALSE) {
-				$f = explode("|",$log_line);
-				$start_date = $f[1];
-				$start_time = $f[2];
-				$start_timestamp = date('Y/m/d H:i:s',strtotime(date('Y').$start_date.' '.$start_time));
-				$elapsed_time = ( strtotime('now') - strtotime(date('Y').$start_date.' '.$start_time) );
-				continue;
-			}
-			if(isset($node) && isset($elapsed_time)) break;
-		}
-/*
-		$return .= "Job Name: ".$job[1]."<br />";
-		$return .= "Node: ".$node."<br />";
-		$return .= "Start Time: ".$start_time."<br />";
-		$return .= "Elapsed Time: ".$elapsed_time."<br />";
-		$return .= "Start Timestamp: ".date('Ymd H:i:s',strtotime(date('Y').$start_date.' '.$start_time))."<br /><br />";
-*/
-		
-		$query = db_select('cm_job_average','cja')
-			->fields('cja')
-			->condition(db_and()
-				->condition('cmja_job_name',$job[1],'=')
-				->condition('cmja_dow',date("N"),'=')
-				->condition('cmja_node_id',$node,'=')
-			);
-		$num_rows = $query->countQuery()->execute()->fetchField();
-		switch ($num_rows) {
-			case 0: 
-				$nomatch[] = "No matches found in DB for job ".$job[1].", day ".date("N");
-				continue 2;
-				break;
-			case 1:
-				$result = $query->execute()->fetchAssoc();
-				break;
-			default:
-				$errors[] = "Multiple matches found in DB for job ".$job[1].", day ".date("N");
-				continue 2;
-		}
-//		$return .= "<pre>".print_r($result,TRUE)."</pre>";
-
-		$avg = round($result['cmja_average']);
-		$diff = ($elapsed_time - $avg);
-
-		if($diff > 30) {
-			$table['#rows'][] = array(
-				t($avg == 0 ? '100%' : round( $diff / $avg * 100 ).'%'),
-				t($job[1]),
-				t($node),
-				t($start_timestamp),
-				t(gmdate('H:i:s',$elapsed_time)),
-				t(gmdate('H:i:s',$avg)),
-				t(gmdate('H:i:s',$diff)),
-				t(gmdate('H:i:s',$result['cmja_min'])),
-				t(gmdate('H:i:s',$result['cmja_max'])),
-			);
-		}
-
-	//	$run_time = (strtotime($now) - strtotime($
-	}
-
-	$return .= theme('table',$table);
+	$return .= theme('table',array('header' => $header,'rows' => $rows ));
+	$return .= theme('pager');
 	
-//	$return .= "<pre>".print_r($nomatch,TRUE)."</pre>";
-//	$return .= "<pre>".print_r($errors,TRUE)."</pre>";
 	return($return);
-}
-function controlm_running_long_execute_ajax_callback($page_callback_result) {
-        echo($page_callback_result);
 }
 
