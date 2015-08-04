@@ -80,7 +80,7 @@ function controlm_unavailable_agents_execute_get_ajax() {
 //	$return .= "<pre>".print_r($psm_output,TRUE)."</pre>";
 	if($rc !== 0) {
 		drupal_set_message('Command returned error '.$rc.': '.$cmd,'error');
-		dsm($output);
+		drupal_set_message($output);
 		return;
 	}
 

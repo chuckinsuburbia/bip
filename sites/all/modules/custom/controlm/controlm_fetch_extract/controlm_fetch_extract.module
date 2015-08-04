@@ -140,7 +140,7 @@ function _controlm_fetch_extract_main() {
 //	        $return .= "<pre>".print_r($output,TRUE)."</pre>";
 		if($rc !== 0) {
 			drupal_set_message('Command returned error '.$rc.': '.$cmd,'error');
-			dsm($output);
+			drupal_set_message($output);
 			return;
 		}
 	}
@@ -227,7 +227,7 @@ function _controlm_fetch_extract_insert_tables($sched_tables,$name_field) {
 			$return .= "Done<br />";
 			unset($att);
 		} else {
-			dsm($table);
+			drupal_set_message($table);
 		}
 
 		foreach($table['JOB'] as $job) {

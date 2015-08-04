@@ -56,8 +56,8 @@ function controlm_running_long_page() {
 	$query->addExpression('ROUND((TIME_TO_SEC(TIMEDIFF(NOW(),cjs.CMJS_START_TIME)) - cja.cmja_average) / cja.cmja_average * 100)','diff_pct');
 	$query->fields('cjs',array('cmjs_start_time'));
 	$query->fields('cja',array('cmja_job_name','cmja_node_id'));
-//	dsm((string) $query);
-//	dsm($query->arguments());
+//	drupal_set_message((string) $query);
+//	drupal_set_message($query->arguments());
 	$num_rows = $query->countQuery()->execute()->fetchField();
 	if($num_rows = 0) {
 		return("No long-running jobs found at this time.");

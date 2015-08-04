@@ -166,7 +166,7 @@ function xmatters_onduty_form_submit($form, &$form_state) {
                         return(array('#markup' => "Client error: ".$err));
                 }
         }
-//	dsm($result);
+//	drupal_set_message($result);
 
 	if(isset($result['return']['scheduleList']['schedule']['name'])) {
 		$markup .= _xmatters_onduty_show_schedule($result['return']['scheduleList']['schedule']);
@@ -240,7 +240,7 @@ function _xmatters_onduty_show_recipient($recipient) {
                 }
         }
 
-//	dsm($result);
+//	drupal_set_message($result);
 	foreach($result['return']['devices'] as $device) {
 		if(isset($device['name'])) {
 			$devices[$device['order']] = $device;

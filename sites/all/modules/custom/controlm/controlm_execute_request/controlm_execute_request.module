@@ -173,7 +173,7 @@ function controlm_execute_request_ctmwhy_get_ajax($jobname = '',$orderid = '') {
 //	$return .= "<pre>".print_r($output,TRUE)."</pre>";
 	if($rc !== 0) {
 		drupal_set_message('Command returned error '.$rc.': '.$cmd,'error');
-		dsm($output);
+		drupal_set_message($output);
 		return;
 	}
 
@@ -206,7 +206,7 @@ function controlm_execute_request_confirmjob_get_ajax($jobname = '',$orderid = '
 //	$return .= "<pre>".print_r($output,TRUE)."</pre>";
 	if($rc !== 0) {
 		drupal_set_message('Command returned error '.$rc.': '.$cmd,'error');
-		dsm($output);
+		drupal_set_message($output);
 		return;
 	}
 
@@ -233,7 +233,7 @@ function controlm_execute_request_freejob_get_ajax($jobname = '',$orderid = '') 
 //	$return .= "<pre>".print_r($output,TRUE)."</pre>";
 	if($rc !== 0) {
 		drupal_set_message('Command returned error '.$rc.': '.$cmd,'error');
-		dsm($output);
+		drupal_set_message($output);
 		return;
 	}
 
